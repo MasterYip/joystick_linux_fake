@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "joystick-linux-fake"
+version = "0.1.0"
+description = "Virtual Linux joystick with a lightweight GUI and evdev backend."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Open Source Contributors" }
+]
+dependencies = [
+  "evdev>=1.9",
+]
+keywords = ["joystick", "evdev", "uinput", "linux", "testing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Software Development :: Testing",
+  "Topic :: System :: Hardware :: Hardware Drivers",
+]
+
+[project.scripts]
+joystick-linux-fake = "joystick_linux_fake.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
