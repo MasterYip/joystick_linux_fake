@@ -103,6 +103,15 @@ Check joystick nodes:
 ls -l /dev/input/js*
 ```
 
+Watch live joystick state with the repository test script:
+
+```bash
+python watch_js.py
+python watch_js.py /dev/input/js0
+```
+
+If reading the joystick node fails, run it with `sudo` or adjust your input-device permissions.
+
 Inspect with standard Linux tools:
 
 ```bash
