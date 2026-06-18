@@ -15,7 +15,7 @@ authors = [
 dependencies = [
   "evdev>=1.9",
 ]
-keywords = ["joystick", "evdev", "uinput", "linux", "testing"]
+keywords = ["joystick", "evdev", "linux", "testing"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",

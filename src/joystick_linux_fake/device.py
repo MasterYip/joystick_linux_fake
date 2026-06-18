@@ -38,12 +38,12 @@ def get_environment_report() -> list[CheckResult]:
             detail="Install with: python -m pip install evdev",
         ),
         CheckResult(
-            label="uinput kernel module loaded",
+            label="virtual input kernel interface available",
             ok=_is_uinput_loaded(),
             detail="Load with: sudo modprobe uinput",
         ),
         CheckResult(
-            label="/dev/uinput present",
+            label="/dev/uinput device present",
             ok=os.path.exists("/dev/uinput"),
             detail="Create or load the kernel module before starting the device.",
         ),
@@ -112,7 +112,7 @@ class VirtualJoystickDevice:
             self._device = UInput(capabilities, name=name, version=0x0003)
         except OSError as exc:
             raise DeviceError(
-                "Unable to create the virtual joystick. Check /dev/uinput access and load the uinput module."
+                "Unable to create the virtual joystick. Check /dev/uinput access for the evdev backend and load the kernel interface if needed."
             ) from exc
 
     def write_state(self, state: JoystickState) -> None:

@@ -6,7 +6,7 @@ It is designed for local testing when a real controller is not available. The pa
 
 ## Features
 
-- `python-evdev` backend only. No mixed device backends and no extra Python GUI dependency.
+- `python-evdev` backend only. No `python-uinput` dependency and no mixed device backends.
 - Desktop GUI with left and right sticks, `L1`, `R1`, `L2`, `R2`, face buttons, and multi-button combinations.
 - Built-in simulation patterns: `circle`, `figure8`, `trigger-pulse`, `combo-demo`, and `idle`.
 - CLI modes for GUI, headless simulation, idle keep-alive, and environment checks.
@@ -14,16 +14,18 @@ It is designed for local testing when a real controller is not available. The pa
 
 ## Requirements
 
-- Linux with `uinput` support
+- Linux
 - Python 3.10+
 - `python-evdev`
 - Tkinter for the GUI
 
 Tkinter ships with many Linux Python builds. If your distribution splits it into a separate package, install `python3-tk` from your system package manager.
 
+The package does not use the `python-uinput` package. It creates the virtual controller through `evdev.UInput`, which still relies on the Linux `/dev/uinput` interface when the kernel exposes it.
+
 ## Installation
 
-### 1. Load the `uinput` kernel module
+### 1. Make sure the Linux virtual input interface is available
 
 ```bash
 sudo modprobe uinput
@@ -138,9 +140,9 @@ sudo evtest /dev/input/eventX
 
 ## Troubleshooting
 
-### `uinput kernel module loaded: FAIL`
+### `virtual input interface not ready`
 
-Load the module:
+Load the module used by `evdev.UInput`:
 
 ```bash
 sudo modprobe uinput
@@ -197,5 +199,6 @@ PYTHONPATH=src python -m unittest discover -s tests
 ## Notes
 
 - The package creates a standard dual-stick virtual gamepad through `evdev.UInput`.
+- There is no `python-uinput` backend in this project.
 - The active `/dev/input/js*` index depends on what is already connected on the host.
 - `dummy_joystick.py` is kept as a compatibility launcher for direct repository use.

@@ -1,6 +1,6 @@
 # Dummy Joystick Setup Guide
 
-This document focuses on system setup for Joystick Linux Fake. The project now uses `python-evdev` as the only runtime backend.
+This document focuses on system setup for Joystick Linux Fake. The project uses `python-evdev` as the only runtime backend.
 
 ## Quick Start
 
@@ -13,7 +13,7 @@ sudo joystick-linux-fake --mode gui
 
 ## System Prerequisites
 
-### Load the `uinput` module
+### Make sure the Linux virtual input interface is available
 
 ```bash
 sudo modprobe uinput
@@ -113,7 +113,7 @@ sudo evtest /dev/input/eventX
 
 ## Troubleshooting
 
-### `uinput kernel module loaded: FAIL`
+### `virtual input interface not ready`
 
 ```bash
 sudo modprobe uinput
@@ -122,6 +122,12 @@ sudo modprobe uinput
 ### `/dev/uinput writable: FAIL`
 
 Run with `sudo` or configure the `input` group and udev rule shown above.
+
+## Important Clarification
+
+This project does not use the `python-uinput` package and does not provide a second backend.
+
+It only uses `python-evdev`. On Linux, `evdev.UInput` still creates the virtual controller through `/dev/uinput`, so that kernel interface may still need to be available even though the Python dependency is only `evdev`.
 
 ### No `/dev/input/js*` node appears
 
