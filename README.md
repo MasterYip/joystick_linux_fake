@@ -51,6 +51,12 @@ If you only want the runtime dependency:
 python -m pip install -r requirements.txt
 ```
 
+**Install System-wide**:
+
+```bash
+sudo apt install python3-evdev python3-tk
+```
+
 ### 3. Grant access to `/dev/uinput` if you do not want to use `sudo`
 
 ```bash
