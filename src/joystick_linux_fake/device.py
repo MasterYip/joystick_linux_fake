@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import glob
+import grp
 import importlib.util
 import os
+import stat
 
 from .state import JoystickState
 
@@ -29,8 +31,44 @@ def _is_uinput_loaded() -> bool:
         return False
 
 
+def _has_uinput_interface() -> bool:
+    return os.path.exists("/dev/uinput") or _is_uinput_loaded()
+
+
+def _uinput_write_detail() -> tuple[bool, str]:
+    device_path = "/dev/uinput"
+    if not os.path.exists(device_path):
+        return False, "Create or load the kernel module before starting the device."
+
+    if os.access(device_path, os.W_OK):
+        return True, "Write access available."
+
+    try:
+        stat_result = os.stat(device_path)
+        group_name = grp.getgrgid(stat_result.st_gid).gr_name
+        mode = stat.S_IMODE(stat_result.st_mode)
+    except (KeyError, OSError):
+        return False, "Run with sudo or grant your user access to /dev/uinput."
+
+    active_group_ids = set(os.getgroups())
+    if stat_result.st_gid not in active_group_ids:
+        return (
+            False,
+            f"/dev/uinput is owned by group '{group_name}' with mode {mode:o}, but your current session is not in that group yet. Start a new login session or use sudo.",
+        )
+
+    return False, f"/dev/uinput is present but not writable for the current session (group '{group_name}', mode {mode:o})."
+
+
 def get_environment_report() -> list[CheckResult]:
     js_devices = sorted(glob.glob("/dev/input/js*"))
+    interface_available = _has_uinput_interface()
+    interface_detail = (
+        "Detected via /dev/uinput."
+        if os.path.exists("/dev/uinput")
+        else "Load with: sudo modprobe uinput"
+    )
+    uinput_writable, uinput_write_detail = _uinput_write_detail()
     return [
         CheckResult(
             label="python-evdev installed",
@@ -39,8 +77,8 @@ def get_environment_report() -> list[CheckResult]:
         ),
         CheckResult(
             label="virtual input kernel interface available",
-            ok=_is_uinput_loaded(),
-            detail="Load with: sudo modprobe uinput",
+            ok=interface_available,
+            detail=interface_detail,
         ),
         CheckResult(
             label="/dev/uinput device present",
@@ -49,8 +87,8 @@ def get_environment_report() -> list[CheckResult]:
         ),
         CheckResult(
             label="/dev/uinput writable",
-            ok=os.access("/dev/uinput", os.W_OK),
-            detail="Run with sudo or grant your user access to /dev/uinput.",
+            ok=uinput_writable,
+            detail=uinput_write_detail,
         ),
         CheckResult(
             label="Existing joystick nodes",
@@ -66,6 +104,14 @@ def format_environment_report(report: list[CheckResult]) -> str:
         status = "OK" if item.ok else "FAIL"
         lines.append(f"[{status}] {item.label}: {item.detail}")
     return "\n".join(lines)
+
+
+def _resolve_ecode(ecodes_module, *names: str) -> int:
+    for name in names:
+        value = getattr(ecodes_module, name, None)
+        if value is not None:
+            return value
+    raise AttributeError(f"None of the evdev ecodes are available: {', '.join(names)}")
 
 
 class VirtualJoystickDevice:
@@ -84,10 +130,10 @@ class VirtualJoystickDevice:
             "r2": e.ABS_RZ,
         }
         self._button_codes = {
-            "south": e.BTN_SOUTH,
-            "east": e.BTN_EAST,
-            "west": e.BTN_WEST,
-            "north": e.BTN_NORTH,
+            "south": _resolve_ecode(e, "BTN_SOUTH", "BTN_A"),
+            "east": _resolve_ecode(e, "BTN_EAST", "BTN_B"),
+            "west": _resolve_ecode(e, "BTN_WEST", "BTN_X"),
+            "north": _resolve_ecode(e, "BTN_NORTH", "BTN_Y"),
             "l1": e.BTN_TL,
             "r1": e.BTN_TR,
             "select": e.BTN_SELECT,

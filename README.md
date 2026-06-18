@@ -79,7 +79,7 @@ joystick-linux-fake --mode gui
 Or use the repository compatibility launcher:
 
 ```bash
-python dummy_joystick.py --mode gui
+sudo python3 dummy_joystick.py --mode gui
 ```
 
 ## GUI Usage
