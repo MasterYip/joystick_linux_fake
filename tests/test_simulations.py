@@ -16,6 +16,8 @@ class SimulationPatternTests(unittest.TestCase):
                 self.assertTrue(-32768 <= state.axes["right_y"] <= 32767)
                 self.assertTrue(0 <= state.axes["l2"] <= 255)
                 self.assertTrue(0 <= state.axes["r2"] <= 255)
+                self.assertIn(state.axes["dpad_x"], (-1, 0, 1))
+                self.assertIn(state.axes["dpad_y"], (-1, 0, 1))
 
 
 if __name__ == "__main__":

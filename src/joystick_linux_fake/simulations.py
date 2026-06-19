@@ -27,6 +27,8 @@ def circle_pattern(elapsed: float) -> JoystickState:
     state.axes["right_y"] = _stick(math.cos(elapsed * 0.6) * 0.45)
     state.axes["l2"] = _trigger((math.sin(elapsed) + 1) / 2)
     state.axes["r2"] = _trigger((math.cos(elapsed) + 1) / 2)
+    state.axes["dpad_x"] = 1 if math.cos(elapsed * 0.5) > 0.6 else -1 if math.cos(elapsed * 0.5) < -0.6 else 0
+    state.axes["dpad_y"] = 1 if math.sin(elapsed * 0.5) > 0.6 else -1 if math.sin(elapsed * 0.5) < -0.6 else 0
     return state
 
 
@@ -37,6 +39,7 @@ def figure8_pattern(elapsed: float) -> JoystickState:
     state.axes["right_x"] = _stick(math.cos(elapsed * 1.2) * 0.35)
     state.axes["right_y"] = _stick(math.sin(elapsed * 0.7) * 0.35)
     state.axes["l2"] = _trigger((math.sin(elapsed * 0.8) + 1) / 2)
+    state.axes["dpad_x"] = 1 if math.sin(elapsed * 0.9) > 0.4 else -1 if math.sin(elapsed * 0.9) < -0.4 else 0
     return state
 
 
@@ -46,6 +49,7 @@ def trigger_pulse_pattern(elapsed: float) -> JoystickState:
     state.axes["right_y"] = _stick(math.cos(elapsed * 0.9) * 0.6)
     state.axes["l2"] = _trigger((math.sin(elapsed * 2.0) + 1) / 2)
     state.axes["r2"] = _trigger((math.sin(elapsed * 2.0 + math.pi / 2) + 1) / 2)
+    state.axes["dpad_y"] = -1 if int(elapsed * 2) % 2 == 0 else 1
     state.buttons["l1"] = int(elapsed * 3) % 2 == 0
     state.buttons["r1"] = int(elapsed * 4) % 2 == 0
     return state
@@ -72,6 +76,8 @@ def combo_demo_pattern(elapsed: float) -> JoystickState:
         state.buttons["mode"] = True
         state.buttons["l3"] = True
         state.buttons["r3"] = True
+    state.axes["dpad_x"] = (-1, 0, 1, 0, 0)[stage]
+    state.axes["dpad_y"] = (0, -1, 0, 1, 0)[stage]
     return state
 
 

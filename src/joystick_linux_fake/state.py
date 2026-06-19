@@ -12,6 +12,8 @@ AXIS_NAMES = (
     "right_y",
     "l2",
     "r2",
+    "dpad_x",
+    "dpad_y",
 )
 
 BUTTON_NAMES = (
@@ -49,6 +51,8 @@ AXIS_LABELS = {
     "right_y": "Right Stick Y",
     "l2": "L2 Trigger",
     "r2": "R2 Trigger",
+    "dpad_x": "D-pad X",
+    "dpad_y": "D-pad Y",
 }
 
 COMBO_PRESETS = {
@@ -66,6 +70,8 @@ AXIS_RANGES = {
     "right_y": (-32768, 32767),
     "l2": (0, 255),
     "r2": (0, 255),
+    "dpad_x": (-1, 1),
+    "dpad_y": (-1, 1),
 }
 
 
@@ -77,6 +83,8 @@ def neutral_axes() -> dict[str, int]:
         "right_y": 0,
         "l2": 0,
         "r2": 0,
+        "dpad_x": 0,
+        "dpad_y": 0,
     }
 
 

@@ -128,12 +128,21 @@ class VirtualJoystickDevice:
             "right_y": e.ABS_RY,
             "l2": e.ABS_Z,
             "r2": e.ABS_RZ,
+            "dpad_x": e.ABS_HAT0X,
+            "dpad_y": e.ABS_HAT0Y,
         }
         self._button_codes = {
             "south": _resolve_ecode(e, "BTN_SOUTH", "BTN_A"),
             "east": _resolve_ecode(e, "BTN_EAST", "BTN_B"),
-            "west": _resolve_ecode(e, "BTN_WEST", "BTN_X"),
-            "north": _resolve_ecode(e, "BTN_NORTH", "BTN_Y"),
+            # Buttons X and Y are at the west / north cardinal positions, but joydev
+            # enumerates BTN codes in numeric order.  BTN_NORTH (0x133) < BTN_WEST
+            # (0x134), so if we mapped west→BTN_WEST and north→BTN_NORTH, the Y
+            # button would land on js button 2 and X on js button 3 — inverted from
+            # what real Xbox controllers report.  Swap the evdev codes so the
+            # cardinal *names* still match physical positions but the joystick API
+            # sees X on button 2 and Y on button 3.
+            "west": _resolve_ecode(e, "BTN_NORTH", "BTN_Y"),
+            "north": _resolve_ecode(e, "BTN_WEST", "BTN_X"),
             "l1": e.BTN_TL,
             "r1": e.BTN_TR,
             "select": e.BTN_SELECT,
@@ -151,6 +160,8 @@ class VirtualJoystickDevice:
                 (e.ABS_RY, AbsInfo(0, -32768, 32767, 16, 128, 0)),
                 (e.ABS_Z, AbsInfo(0, 0, 255, 0, 0, 0)),
                 (e.ABS_RZ, AbsInfo(0, 0, 255, 0, 0, 0)),
+                (e.ABS_HAT0X, AbsInfo(0, -1, 1, 0, 0, 0)),
+                (e.ABS_HAT0Y, AbsInfo(0, -1, 1, 0, 0, 0)),
             ],
         }
 

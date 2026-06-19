@@ -19,6 +19,10 @@ def _trigger_percent_to_axis(value: str) -> int:
     return int(round(float(value) * 255 / 100))
 
 
+def _hat_value(value: str) -> int:
+    return max(-1, min(1, int(round(float(value)))))
+
+
 class JoystickApp:
     def __init__(self, root: tk.Tk, device_name: str, update_rate_hz: int) -> None:
         self.root = root
@@ -38,6 +42,8 @@ class JoystickApp:
             "right_y": tk.IntVar(value=0),
             "l2": tk.IntVar(value=0),
             "r2": tk.IntVar(value=0),
+            "dpad_x": tk.IntVar(value=0),
+            "dpad_y": tk.IntVar(value=0),
         }
         self.button_vars = {name: tk.BooleanVar(value=False) for name in BUTTON_NAMES}
         self.manual_widgets: list[tk.Widget] = []
@@ -102,6 +108,8 @@ class JoystickApp:
         self._add_stick_scale(axis_frame, "right_y", row=1, column=1)
         self._add_trigger_scale(axis_frame, "l2", row=2, column=0)
         self._add_trigger_scale(axis_frame, "r2", row=2, column=1)
+        self._add_hat_scale(axis_frame, "dpad_x", row=3, column=0)
+        self._add_hat_scale(axis_frame, "dpad_y", row=3, column=1)
 
         buttons_frame = ttk.LabelFrame(content, text="Buttons and Combos", padding=12)
         buttons_frame.grid(row=0, column=1, sticky="nsew")
@@ -173,6 +181,22 @@ class JoystickApp:
         ttk.Label(frame, textvariable=self.axis_vars[axis_name], width=5).grid(row=1, column=1, padx=(8, 0))
         self.manual_widgets.append(scale)
 
+    def _add_hat_scale(self, parent: ttk.Frame, axis_name: str, row: int, column: int) -> None:
+        frame = ttk.Frame(parent, padding=(0, 12, 12, 0))
+        frame.grid(row=row, column=column, sticky="ew")
+        frame.columnconfigure(0, weight=1)
+        ttk.Label(frame, text=AXIS_LABELS[axis_name]).grid(row=0, column=0, sticky="w")
+        scale = ttk.Scale(
+            frame,
+            from_=-1,
+            to=1,
+            variable=self.axis_vars[axis_name],
+            command=lambda value, control=axis_name: self._on_hat_change(control, value),
+        )
+        scale.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        ttk.Label(frame, textvariable=self.axis_vars[axis_name], width=5).grid(row=1, column=1, padx=(8, 0))
+        self.manual_widgets.append(scale)
+
     def _set_manual_controls_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
         for widget in self.manual_widgets:
@@ -229,6 +253,11 @@ class JoystickApp:
         if self.controller is None or (self.simulation is not None and self.simulation.running):
             return
         self.controller.set_axis(axis_name, _trigger_percent_to_axis(value))
+
+    def _on_hat_change(self, axis_name: str, value: str) -> None:
+        if self.controller is None or (self.simulation is not None and self.simulation.running):
+            return
+        self.controller.set_axis(axis_name, _hat_value(value))
 
     def _on_button_toggle(self, button_name: str) -> None:
         if self.controller is None or (self.simulation is not None and self.simulation.running):
