@@ -1,0 +1,26 @@
+# Xbox 360 / Xbox One / Xbox Series gamepad mapping
+name: "Xbox 360 Controller"
+version: 1
+
+axes:
+  0: {logical: left_x,  label: "Left Stick X",  min: -32768, max: 32767}
+  1: {logical: left_y,  label: "Left Stick Y",  min: -32768, max: 32767}
+  2: {logical: l2,      label: "L2 Trigger",    min: 0,      max: 255}
+  3: {logical: right_x, label: "Right Stick X", min: -32768, max: 32767}
+  4: {logical: right_y, label: "Right Stick Y", min: -32768, max: 32767}
+  5: {logical: r2,      label: "R2 Trigger",    min: 0,      max: 255}
+  6: {logical: dpad_x,  label: "D-Pad X",       min: -1,     max: 1}
+  7: {logical: dpad_y,  label: "D-Pad Y",       min: -1,     max: 1}
+
+buttons:
+  0: {logical: south,  label: "A"}
+  1: {logical: east,   label: "B"}
+  2: {logical: west,   label: "X"}
+  3: {logical: north,  label: "Y"}
+  4: {logical: l1,     label: "LB"}
+  5: {logical: r1,     label: "RB"}
+  6: {logical: select, label: "Back"}
+  7: {logical: start,  label: "Start"}
+  8: {logical: mode,   label: "Guide"}
+  9: {logical: l3,     label: "L3"}
+  10: {logical: r3,    label: "R3"}

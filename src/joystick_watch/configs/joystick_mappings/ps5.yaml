@@ -1,0 +1,30 @@
+# PS5 DualSense controller mapping (hid-playstation driver)
+name: "PS5 DualSense"
+version: 1
+
+axes:
+  0: {logical: left_x,  label: "Left Stick X",  min: -32768, max: 32767}
+  1: {logical: left_y,  label: "Left Stick Y",  min: -32768, max: 32767}
+  2: {logical: right_x, label: "Right Stick X", min: -32768, max: 32767}
+  3: {logical: l2,      label: "L2 Trigger",    min: 0,      max: 255}
+  4: {logical: right_y, label: "Right Stick Y", min: -32768, max: 32767}
+  5: {logical: r2,      label: "R2 Trigger",    min: 0,      max: 255}
+  6: {logical: dpad_x,  label: "D-Pad X",       min: -1,     max: 1}
+  7: {logical: dpad_y,  label: "D-Pad Y",       min: -1,     max: 1}
+
+buttons:
+  0: {logical: south,  label: "Cross"}
+  1: {logical: east,   label: "Circle"}
+  2: {logical: west,   label: "Square"}
+  3: {logical: north,  label: "Triangle"}
+  4: {logical: l1,     label: "L1"}
+  5: {logical: r1,     label: "R1"}
+  6: {logical: l2_btn, label: "L2 Btn"}
+  7: {logical: r2_btn, label: "R2 Btn"}
+  8: {logical: select, label: "Share"}
+  9: {logical: start,  label: "Options"}
+  10: {logical: mode,   label: "PS"}
+  11: {logical: l3,     label: "L3"}
+  12: {logical: r3,     label: "R3"}
+  13: {logical: touchpad, label: "Touchpad"}
+  14: {logical: mic,    label: "Mic"}

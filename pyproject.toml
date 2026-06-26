@@ -14,6 +14,7 @@ authors = [
 ]
 dependencies = [
   "evdev>=1.9",
+  "pyyaml>=6.0",
 ]
 keywords = ["joystick", "evdev", "linux", "testing"]
 classifiers = [
@@ -30,6 +31,7 @@ classifiers = [
 
 [project.scripts]
 joystick-linux-fake = "joystick_linux_fake.cli:main"
+joystick-watch = "joystick_watch.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
