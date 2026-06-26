@@ -52,7 +52,7 @@ sudo modprobe uinput
 **joystick-linux-fake** — create and control a virtual gamepad:
 
 ```bash
-joystick-linux-fake --mode gui
+joystick-linux-fake --mode gui --config xbox
 ```
 
 **joystick-watch** — visualize any joystick in real time:
