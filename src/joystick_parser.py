@@ -546,7 +546,7 @@ class JoystickParser:
                     payload = self._fd.read(_JS_EVENT_SIZE)
                 except BlockingIOError:
                     break
-                if len(payload) != _JS_EVENT_SIZE:
+                if payload is None or len(payload) != _JS_EVENT_SIZE:
                     break
                 timestamp_ms, value, event_type, number = struct.unpack(
                     _JS_EVENT_FORMAT, payload
@@ -600,13 +600,17 @@ class JoystickParser:
                 self._running = False
                 break
 
-            if len(payload) != _JS_EVENT_SIZE:
+            if payload is None or len(payload) != _JS_EVENT_SIZE:
                 self._running = False
                 break
 
-            timestamp_ms, value, event_type, number = struct.unpack(
-                _JS_EVENT_FORMAT, payload
-            )
+            try:
+                timestamp_ms, value, event_type, number = struct.unpack(
+                    _JS_EVENT_FORMAT, payload
+                )
+            except struct.error:
+                self._running = False
+                break
             is_init = bool(event_type & JS_EVENT_INIT)
             base_type = event_type & ~JS_EVENT_INIT
             is_axis = base_type == JS_EVENT_AXIS
