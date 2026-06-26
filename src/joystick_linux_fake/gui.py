@@ -58,7 +58,10 @@ class JoystickApp:
         header = ttk.Frame(self.root, padding=16)
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="Joystick Linux Fake", font=("TkDefaultFont", 18, "bold")).grid(
+        import tkinter.font as _tkfont
+        _title_font = _tkfont.Font(font="TkDefaultFont")
+        _title_font.configure(weight="bold")
+        ttk.Label(header, text="Joystick Linux Fake", font=_title_font).grid(
             row=0, column=0, sticky="w"
         )
         ttk.Label(header, textvariable=self.status_var).grid(row=1, column=0, sticky="w", pady=(6, 0))
@@ -291,11 +294,24 @@ class JoystickApp:
         self.root.destroy()
 
 
-def launch_gui(device_name: str = "Joystick Linux Fake", update_rate_hz: int = 125) -> int:
+def launch_gui(device_name: str = "Joystick Linux Fake", update_rate_hz: int = 125, scaling: float | None = None) -> int:
     if not os.environ.get("DISPLAY"):
         print("No DISPLAY environment variable found. Use --mode simulate or run from a desktop session.")
         return 1
+
+    # Apply HiDPI scaling before creating any widgets.
+    # We import the helper from joystick_watch so the logic lives in one place.
+    try:
+        from joystick_watch.tk_scaling import apply_scaling as _apply_scaling
+    except ImportError:
+        _apply_scaling = None  # fallback when running from source
+
     root = tk.Tk()
+    if _apply_scaling is not None:
+        _apply_scaling(root, scaling)
+    elif scaling is not None:
+        root.tk.call("tk", "scaling", scaling)
+
     ttk.Style(root).theme_use("clam")
     JoystickApp(root, device_name=device_name, update_rate_hz=update_rate_hz)
     root.mainloop()

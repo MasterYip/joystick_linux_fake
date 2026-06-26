@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=125,
         help="State refresh rate in Hz for the virtual device.",
     )
+    parser.add_argument(
+        "--scaling",
+        type=float,
+        default=None,
+        help="Tkinter UI scaling factor for HiDPI displays (e.g. 2.0 for 200%%). Auto-detected when omitted.",
+    )
     return parser
 
 
@@ -89,7 +95,7 @@ def run_simulate(args: argparse.Namespace) -> int:
 def run_gui(args: argparse.Namespace) -> int:
     from .gui import launch_gui
 
-    return launch_gui(device_name=args.device_name, update_rate_hz=args.update_rate)
+    return launch_gui(device_name=args.device_name, update_rate_hz=args.update_rate, scaling=args.scaling)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -231,7 +231,7 @@ class JoystickWatchApp:
             height=8,
             wrap="none",
             state="disabled",
-            font=("TkFixedFont", 9),
+            font="TkFixedFont",
             bg="#1e1e1e",
             fg="#d4d4d4",
             insertbackground="#d4d4d4",
@@ -331,7 +331,7 @@ class JoystickWatchApp:
             indicator = tk.Label(
                 frame,
                 text=" ● ",
-                font=("TkDefaultFont", 10, "bold"),
+                font="TkDefaultFont",
                 fg="#555555",  # off state
                 bg=self.root.cget("bg"),
             )
@@ -577,6 +577,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print detected /dev/input/js* devices and exit.",
     )
     parser.add_argument(
+        "--scaling",
+        type=float,
+        default=None,
+        help="Tkinter UI scaling factor for HiDPI displays (e.g. 2.0 for 200%%). Auto-detected when omitted.",
+    )
+    parser.add_argument(
         "--list-mappings",
         action="store_true",
         help="Print available built-in and filesystem mappings and exit.",
@@ -617,7 +623,10 @@ def main(argv: list[str] | None = None) -> int:
         print("No DISPLAY environment variable found. Use --list-devices or --list-mappings, or run from a desktop session.")
         return 1
 
+    from .tk_scaling import apply_scaling
+
     root = tk.Tk()
+    apply_scaling(root, args.scaling)
     ttk.Style(root).theme_use("clam")
     JoystickWatchApp(root, device_path=args.device)
     root.mainloop()
