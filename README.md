@@ -4,6 +4,11 @@ A small Python project for virtual joystick creation, real-time visualization, a
 
 ## Introduction
 
+<table><tr>
+<td><img src="doc/joystick_fake_gui.png" alt="Joystick Linux Fake GUI" height="280"></td>
+<td><img src="doc/joystick_watch.png" alt="Joystick Watch GUI" height="280"></td>
+</tr></table>
+
 This project provides three tools:
 
 | Tool | Purpose |
@@ -130,7 +135,7 @@ joystick-watch
 joystick-linux-fake --mode gui
 ```
 
-The GUI exposes:
+The GUI layout is built dynamically from the selected mapping config.  By default it exposes the standard Xbox layout:
 
 - Left and right stick sliders (`left_x`, `left_y`, `right_x`, `right_y`)
 - Analog trigger sliders (`L2`, `R2`)
@@ -141,7 +146,27 @@ The GUI exposes:
 
 Manual combinations work by checking multiple buttons at once. The **Tap Combo** action sends a short simultaneous press for a preset combination.
 
+Select a different joystick type with `--config`:
+
+```bash
+joystick-linux-fake --mode gui --config ps5
+joystick-linux-fake --mode gui --config /path/to/custom.yaml
+```
+
+The GUI rebuilds its axes panel and button panel automatically to match the config.
+
 ### CLI Usage
+
+All CLI modes accept `--config` to choose a joystick mapping:
+
+```bash
+# Built-in names
+joystick-linux-fake --mode idle --config xbox
+joystick-linux-fake --mode simulate --pattern circle --config ps5
+
+# Custom YAML file
+joystick-linux-fake --mode simulate --pattern combo-demo --config my_controller.yaml
+```
 
 **Idle** — keep the device available without moving controls:
 

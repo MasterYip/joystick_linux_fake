@@ -44,7 +44,32 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Tkinter UI scaling factor for HiDPI displays (e.g. 2.0 for 200%%). Auto-detected when omitted.",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Joystick mapping: 'xbox', 'ps5', or path to a YAML file.  Default: xbox (built-in).",
+    )
     return parser
+
+
+def _resolve_config(identifier: str | None):
+    """Resolve a --config CLI value to a JoyMappingConfig, or None for default."""
+    if identifier is None:
+        return None
+    try:
+        from joystick_parser import get_mapping
+        return get_mapping(identifier)
+    except ImportError:
+        print("Warning: joystick_parser not available — using built-in Xbox mapping.", flush=True)
+        return None
+
+
+def _make_controller(args: argparse.Namespace):
+    return JoystickController(
+        device_name=args.device_name,
+        update_rate_hz=args.update_rate,
+        config=_resolve_config(args.config),
+    )
 
 
 def run_check() -> int:
@@ -54,13 +79,11 @@ def run_check() -> int:
 
 
 def run_idle(args: argparse.Namespace) -> int:
-    controller = JoystickController(
-        device_name=args.device_name,
-        update_rate_hz=args.update_rate,
-    )
+    controller = _make_controller(args)
     controller.start()
+    cfg_name = controller.config.name if controller.config else "xbox"
     print(f"Virtual joystick ready: {args.device_name}")
-    print("Mode: idle")
+    print(f"Mode: idle  |  Mapping: {cfg_name}")
     print("Press Ctrl+C to stop.")
     try:
         while True:
@@ -72,15 +95,13 @@ def run_idle(args: argparse.Namespace) -> int:
 
 
 def run_simulate(args: argparse.Namespace) -> int:
-    controller = JoystickController(
-        device_name=args.device_name,
-        update_rate_hz=args.update_rate,
-    )
+    controller = _make_controller(args)
     session = SimulationSession(controller)
     controller.start()
     session.start(args.pattern)
+    cfg_name = controller.config.name if controller.config else "xbox"
     print(f"Virtual joystick ready: {args.device_name}")
-    print(f"Mode: simulate ({args.pattern})")
+    print(f"Mode: simulate ({args.pattern})  |  Mapping: {cfg_name}")
     print("Press Ctrl+C to stop.")
     try:
         while True:
@@ -95,7 +116,12 @@ def run_simulate(args: argparse.Namespace) -> int:
 def run_gui(args: argparse.Namespace) -> int:
     from .gui import launch_gui
 
-    return launch_gui(device_name=args.device_name, update_rate_hz=args.update_rate, scaling=args.scaling)
+    return launch_gui(
+        device_name=args.device_name,
+        update_rate_hz=args.update_rate,
+        scaling=args.scaling,
+        config=_resolve_config(args.config),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

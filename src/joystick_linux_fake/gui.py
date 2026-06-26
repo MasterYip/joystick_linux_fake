@@ -1,4 +1,4 @@
-"""Tkinter GUI for the virtual joystick."""
+"""Tkinter GUI for the virtual joystick — layout built dynamically from the mapping config."""
 
 from __future__ import annotations
 
@@ -8,23 +8,31 @@ from tkinter import messagebox, ttk
 
 from .controller import JoystickController, SimulationSession
 from .device import DeviceError, format_environment_report, get_environment_report
-from .state import AXIS_LABELS, BUTTON_LABELS, BUTTON_NAMES, COMBO_PRESETS
-
-
-def _stick_percent_to_axis(value: str) -> int:
-    return int(round(float(value) * 32767 / 100))
-
-
-def _trigger_percent_to_axis(value: str) -> int:
-    return int(round(float(value) * 255 / 100))
+from .state import (
+    AXIS_LABELS,
+    BUTTON_LABELS,
+    BUTTON_NAMES,
+    COMBO_PRESETS,
+    axis_labels_from_config,
+    axis_ranges_from_config,
+    button_labels_from_config,
+)
 
 
 def _hat_value(value: str) -> int:
     return max(-1, min(1, int(round(float(value)))))
 
 
+def _percent_for_range(value: str, min_val: int, max_val: int) -> int:
+    """Convert a slider percentage to a raw axis value."""
+    span = max_val - min_val
+    return int(round(float(value) * span / 100 + min_val))
+
+
 class JoystickApp:
-    def __init__(self, root: tk.Tk, device_name: str, update_rate_hz: int) -> None:
+    def __init__(
+        self, root: tk.Tk, device_name: str, update_rate_hz: int, config=None
+    ) -> None:
         self.root = root
         self.root.title("Joystick Linux Fake")
         self.root.minsize(860, 620)
@@ -32,24 +40,45 @@ class JoystickApp:
         self.simulation: SimulationSession | None = None
         self.device_name = device_name
         self.update_rate_hz = update_rate_hz
+        self.config = config
+
+        # Config-derived data
+        if config is not None:
+            self._axis_names: list[str] = [
+                am.logical for _n, am in sorted(config.axes.items())
+            ]
+            self._axis_labels: dict[str, str] = axis_labels_from_config(config)
+            self._axis_ranges: dict[str, tuple[int, int]] = axis_ranges_from_config(config)
+            self._button_names: list[str] = [
+                bm.logical for _n, bm in sorted(config.buttons.items())
+            ]
+            self._button_labels: dict[str, str] = button_labels_from_config(config)
+        else:
+            from .state import AXIS_NAMES as _AN, AXIS_RANGES as _AR
+            self._axis_names = list(_AN)
+            self._axis_labels = dict(AXIS_LABELS)
+            self._axis_ranges = dict(_AR)
+            self._button_names = list(BUTTON_NAMES)
+            self._button_labels = dict(BUTTON_LABELS)
+
         self.status_var = tk.StringVar(value="Device not started.")
         self.pattern_var = tk.StringVar(value="circle")
-        self.combo_var = tk.StringVar(value=next(iter(COMBO_PRESETS)))
-        self.axis_vars = {
-            "left_x": tk.IntVar(value=0),
-            "left_y": tk.IntVar(value=0),
-            "right_x": tk.IntVar(value=0),
-            "right_y": tk.IntVar(value=0),
-            "l2": tk.IntVar(value=0),
-            "r2": tk.IntVar(value=0),
-            "dpad_x": tk.IntVar(value=0),
-            "dpad_y": tk.IntVar(value=0),
-        }
-        self.button_vars = {name: tk.BooleanVar(value=False) for name in BUTTON_NAMES}
+        self.combo_var = tk.StringVar(value=next(iter(COMBO_PRESETS), ""))
+
+        self.axis_vars: dict[str, tk.IntVar] = {}
+        for name in self._axis_names:
+            lo, hi = self._axis_ranges.get(name, (-32768, 32767))
+            self.axis_vars[name] = tk.IntVar(value=max(lo, min(hi, 0)))
+
+        self.button_vars = {name: tk.BooleanVar(value=False) for name in self._button_names}
         self.manual_widgets: list[tk.Widget] = []
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self._build_ui()
         self._set_manual_controls_enabled(False)
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         self.root.columnconfigure(0, weight=1)
@@ -64,7 +93,9 @@ class JoystickApp:
         ttk.Label(header, text="Joystick Linux Fake", font=_title_font).grid(
             row=0, column=0, sticky="w"
         )
-        ttk.Label(header, textvariable=self.status_var).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(header, textvariable=self.status_var).grid(
+            row=1, column=0, sticky="w", pady=(6, 0)
+        )
 
         toolbar = ttk.Frame(self.root, padding=(16, 0, 16, 12))
         toolbar.grid(row=1, column=0, sticky="ew")
@@ -73,7 +104,9 @@ class JoystickApp:
 
         start_button = ttk.Button(toolbar, text="Start Device", command=self.start_device)
         stop_button = ttk.Button(toolbar, text="Stop Device", command=self.stop_device)
-        check_button = ttk.Button(toolbar, text="Check Setup", command=self.show_environment_report)
+        check_button = ttk.Button(
+            toolbar, text="Check Setup", command=self.show_environment_report
+        )
         reset_button = ttk.Button(toolbar, text="Reset Controls", command=self.reset_controls)
         start_button.grid(row=0, column=0, padx=(0, 8), sticky="w")
         stop_button.grid(row=0, column=1, padx=(0, 8), sticky="w")
@@ -100,105 +133,118 @@ class JoystickApp:
         content.columnconfigure(1, weight=2)
         content.rowconfigure(0, weight=1)
 
+        self._build_axis_panel(content)
+        self._build_button_panel(content)
+
+    # ------------------------------------------------------------------
+    # Axis panel — built dynamically from config
+    # ------------------------------------------------------------------
+
+    def _build_axis_panel(self, content: ttk.Frame) -> None:
         axis_frame = ttk.LabelFrame(content, text="Axes and Triggers", padding=12)
         axis_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        axis_frame.columnconfigure(0, weight=1)
-        axis_frame.columnconfigure(1, weight=1)
+        for col in range(2):
+            axis_frame.columnconfigure(col, weight=1)
 
-        self._add_stick_scale(axis_frame, "left_x", row=0, column=0)
-        self._add_stick_scale(axis_frame, "left_y", row=1, column=0)
-        self._add_stick_scale(axis_frame, "right_x", row=0, column=1)
-        self._add_stick_scale(axis_frame, "right_y", row=1, column=1)
-        self._add_trigger_scale(axis_frame, "l2", row=2, column=0)
-        self._add_trigger_scale(axis_frame, "r2", row=2, column=1)
-        self._add_hat_scale(axis_frame, "dpad_x", row=3, column=0)
-        self._add_hat_scale(axis_frame, "dpad_y", row=3, column=1)
+        axes_list = list(self._axis_names)
+        for idx, name in enumerate(axes_list):
+            row = idx // 2
+            col = idx % 2
+            lo, hi = self._axis_ranges.get(name, (-32768, 32767))
+            label = self._axis_labels.get(name, name)
+            span = hi - lo
+            if span >= 65535:
+                # Stick axis
+                self._add_axis_row(axis_frame, name, label, row, col, -100, 100,
+                                   lambda v, lo_=lo, hi_=hi: _percent_for_range(v, lo_, hi_))
+            elif span <= 10:
+                # Hat axis
+                self._add_axis_row(axis_frame, name, label, row, col, -1, 1,
+                                   lambda v: _hat_value(v))
+            else:
+                # Trigger axis
+                self._add_axis_row(axis_frame, name, label, row, col, 0, 100,
+                                   lambda v, lo_=lo, hi_=hi: _percent_for_range(v, lo_, hi_))
 
+    def _add_axis_row(self, parent, name, label, row, col, from_, to, convert):
+        frame = ttk.Frame(parent, padding=(0, 0, 12, 12))
+        frame.grid(row=row, column=col, sticky="ew")
+        frame.columnconfigure(0, weight=1)
+        ttk.Label(frame, text=label).grid(row=0, column=0, sticky="w")
+        scale = ttk.Scale(
+            frame,
+            from_=from_,
+            to=to,
+            variable=self.axis_vars[name],
+            command=lambda value, n=name, c=convert: self._on_axis_change(n, c(value)),
+        )
+        scale.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        ttk.Label(frame, textvariable=self.axis_vars[name], width=5).grid(
+            row=1, column=1, padx=(8, 0)
+        )
+        self.manual_widgets.append(scale)
+
+    # ------------------------------------------------------------------
+    # Button panel — built dynamically from config
+    # ------------------------------------------------------------------
+
+    def _build_button_panel(self, content: ttk.Frame) -> None:
         buttons_frame = ttk.LabelFrame(content, text="Buttons and Combos", padding=12)
         buttons_frame.grid(row=0, column=1, sticky="nsew")
         buttons_frame.columnconfigure(0, weight=1)
         buttons_frame.columnconfigure(1, weight=1)
         ttk.Label(
             buttons_frame,
-            text="Checked buttons stay pressed together, so manual combinations are supported directly.",
+            text="Checked buttons stay pressed together.",
             wraplength=280,
             justify="left",
         ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
-        for index, name in enumerate(BUTTON_NAMES):
+        # Dynamic button checkboxes
+        btn_count = len(self._button_names)
+        for index, name in enumerate(self._button_names):
+            display = self._button_labels.get(name, name)
             button = ttk.Checkbutton(
                 buttons_frame,
-                text=BUTTON_LABELS[name],
+                text=display,
                 variable=self.button_vars[name],
-                command=lambda control=name: self._on_button_toggle(control),
+                command=lambda n=name: self._on_button_toggle(n),
             )
             button.grid(row=1 + index // 2, column=index % 2, sticky="w", pady=4)
             self.manual_widgets.append(button)
 
-        combo_row = 1 + (len(BUTTON_NAMES) + 1) // 2 + 1
+        # Combo presets — keyed by display labels; filter to available buttons
+        combo_row = 1 + (btn_count + 1) // 2 + 1
         ttk.Separator(buttons_frame, orient="horizontal").grid(
             row=combo_row, column=0, columnspan=2, sticky="ew", pady=10
         )
-        ttk.Label(buttons_frame, text="Preset combo").grid(row=combo_row + 1, column=0, sticky="w")
+        ttk.Label(buttons_frame, text="Preset combo").grid(
+            row=combo_row + 1, column=0, sticky="w"
+        )
+
+        available_combos = []
+        for label_, names in COMBO_PRESETS.items():
+            if all(n in self._button_names for n in names):
+                available_combos.append(label_)
+        if not available_combos:
+            available_combos = list(COMBO_PRESETS)
+
+        self.combo_var.set(available_combos[0])
         combo_box = ttk.Combobox(
             buttons_frame,
             textvariable=self.combo_var,
-            values=list(COMBO_PRESETS),
+            values=available_combos,
             state="readonly",
             width=18,
         )
         combo_box.grid(row=combo_row + 1, column=1, sticky="ew")
         combo_button = ttk.Button(buttons_frame, text="Tap Combo", command=self.tap_combo)
         combo_button.grid(row=combo_row + 2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-        self.manual_widgets.extend([combo_box, combo_button, pattern_box, reset_button])
+        self.manual_widgets.extend([combo_box, combo_button])
 
-    def _add_stick_scale(self, parent: ttk.Frame, axis_name: str, row: int, column: int) -> None:
-        frame = ttk.Frame(parent, padding=(0, 0, 12, 12))
-        frame.grid(row=row, column=column, sticky="ew")
-        frame.columnconfigure(0, weight=1)
-        ttk.Label(frame, text=AXIS_LABELS[axis_name]).grid(row=0, column=0, sticky="w")
-        scale = ttk.Scale(
-            frame,
-            from_=-100,
-            to=100,
-            variable=self.axis_vars[axis_name],
-            command=lambda value, control=axis_name: self._on_stick_change(control, value),
-        )
-        scale.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Label(frame, textvariable=self.axis_vars[axis_name], width=5).grid(row=1, column=1, padx=(8, 0))
-        self.manual_widgets.append(scale)
-
-    def _add_trigger_scale(self, parent: ttk.Frame, axis_name: str, row: int, column: int) -> None:
-        frame = ttk.Frame(parent, padding=(0, 0, 12, 0))
-        frame.grid(row=row, column=column, sticky="ew")
-        frame.columnconfigure(0, weight=1)
-        ttk.Label(frame, text=AXIS_LABELS[axis_name]).grid(row=0, column=0, sticky="w")
-        scale = ttk.Scale(
-            frame,
-            from_=0,
-            to=100,
-            variable=self.axis_vars[axis_name],
-            command=lambda value, control=axis_name: self._on_trigger_change(control, value),
-        )
-        scale.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Label(frame, textvariable=self.axis_vars[axis_name], width=5).grid(row=1, column=1, padx=(8, 0))
-        self.manual_widgets.append(scale)
-
-    def _add_hat_scale(self, parent: ttk.Frame, axis_name: str, row: int, column: int) -> None:
-        frame = ttk.Frame(parent, padding=(0, 12, 12, 0))
-        frame.grid(row=row, column=column, sticky="ew")
-        frame.columnconfigure(0, weight=1)
-        ttk.Label(frame, text=AXIS_LABELS[axis_name]).grid(row=0, column=0, sticky="w")
-        scale = ttk.Scale(
-            frame,
-            from_=-1,
-            to=1,
-            variable=self.axis_vars[axis_name],
-            command=lambda value, control=axis_name: self._on_hat_change(control, value),
-        )
-        scale.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Label(frame, textvariable=self.axis_vars[axis_name], width=5).grid(row=1, column=1, padx=(8, 0))
-        self.manual_widgets.append(scale)
+    # ------------------------------------------------------------------
+    # Control
+    # ------------------------------------------------------------------
 
     def _set_manual_controls_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
@@ -213,7 +259,9 @@ class JoystickApp:
             self.status_var.set(f"Device running: {self.device_name}")
             return
         try:
-            controller = JoystickController(self.device_name, self.update_rate_hz)
+            controller = JoystickController(
+                self.device_name, self.update_rate_hz, config=self.config
+            )
             controller.start()
         except DeviceError as exc:
             messagebox.showerror("Unable to start virtual joystick", str(exc))
@@ -235,42 +283,43 @@ class JoystickApp:
         self.status_var.set("Device stopped.")
 
     def show_environment_report(self) -> None:
-        messagebox.showinfo("Environment check", format_environment_report(get_environment_report()))
+        messagebox.showinfo(
+            "Environment check", format_environment_report(get_environment_report())
+        )
 
     def reset_controls(self) -> None:
         if self.simulation is not None and self.simulation.running:
             return
-        for variable in self.axis_vars.values():
-            variable.set(0)
-        for variable in self.button_vars.values():
-            variable.set(False)
+        for name, var in self.axis_vars.items():
+            lo, hi = self._axis_ranges.get(name, (-32768, 32767))
+            var.set(max(lo, min(hi, 0)))
+        for var in self.button_vars.values():
+            var.set(False)
         if self.controller is not None:
             self.controller.reset()
 
-    def _on_stick_change(self, axis_name: str, value: str) -> None:
-        if self.controller is None or (self.simulation is not None and self.simulation.running):
+    def _on_axis_change(self, axis_name: str, value: int) -> None:
+        if self.controller is None or (
+            self.simulation is not None and self.simulation.running
+        ):
             return
-        self.controller.set_axis(axis_name, _stick_percent_to_axis(value))
-
-    def _on_trigger_change(self, axis_name: str, value: str) -> None:
-        if self.controller is None or (self.simulation is not None and self.simulation.running):
-            return
-        self.controller.set_axis(axis_name, _trigger_percent_to_axis(value))
-
-    def _on_hat_change(self, axis_name: str, value: str) -> None:
-        if self.controller is None or (self.simulation is not None and self.simulation.running):
-            return
-        self.controller.set_axis(axis_name, _hat_value(value))
+        self.controller.set_axis(axis_name, value)
 
     def _on_button_toggle(self, button_name: str) -> None:
-        if self.controller is None or (self.simulation is not None and self.simulation.running):
+        if self.controller is None or (
+            self.simulation is not None and self.simulation.running
+        ):
             return
         self.controller.set_button(button_name, self.button_vars[button_name].get())
 
     def tap_combo(self) -> None:
         if self.controller is None:
             return
-        self.controller.tap_buttons(tuple(COMBO_PRESETS[self.combo_var.get()]))
+        combo_label = self.combo_var.get()
+        names = COMBO_PRESETS.get(combo_label, ())
+        available = tuple(n for n in names if n in self._button_names)
+        if available:
+            self.controller.tap_buttons(available)
 
     def start_simulation(self) -> None:
         self.start_device()
@@ -294,17 +343,23 @@ class JoystickApp:
         self.root.destroy()
 
 
-def launch_gui(device_name: str = "Joystick Linux Fake", update_rate_hz: int = 125, scaling: float | None = None) -> int:
+def launch_gui(
+    device_name: str = "Joystick Linux Fake",
+    update_rate_hz: int = 125,
+    scaling: float | None = None,
+    config=None,
+) -> int:
     if not os.environ.get("DISPLAY"):
-        print("No DISPLAY environment variable found. Use --mode simulate or run from a desktop session.")
+        print(
+            "No DISPLAY environment variable found. "
+            "Use --mode simulate or run from a desktop session."
+        )
         return 1
 
-    # Apply HiDPI scaling before creating any widgets.
-    # We import the helper from joystick_watch so the logic lives in one place.
     try:
         from joystick_watch.tk_scaling import apply_scaling as _apply_scaling
     except ImportError:
-        _apply_scaling = None  # fallback when running from source
+        _apply_scaling = None
 
     root = tk.Tk()
     if _apply_scaling is not None:
@@ -313,6 +368,8 @@ def launch_gui(device_name: str = "Joystick Linux Fake", update_rate_hz: int = 1
         root.tk.call("tk", "scaling", scaling)
 
     ttk.Style(root).theme_use("clam")
-    JoystickApp(root, device_name=device_name, update_rate_hz=update_rate_hz)
+    JoystickApp(
+        root, device_name=device_name, update_rate_hz=update_rate_hz, config=config
+    )
     root.mainloop()
     return 0

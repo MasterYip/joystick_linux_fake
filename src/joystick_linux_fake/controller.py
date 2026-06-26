@@ -7,32 +7,58 @@ import time
 
 from .device import VirtualJoystickDevice
 from .simulations import PATTERNS
-from .state import AXIS_RANGES, JoystickState
-
-
-def clamp_axis(axis_name: str, value: int) -> int:
-    low, high = AXIS_RANGES[axis_name]
-    return max(low, min(high, int(value)))
+from .state import JoystickState, axis_ranges_from_config, neutral_axes_from_config, neutral_buttons_from_config
 
 
 class JoystickController:
-    """Owns the virtual joystick device and a steady state write loop."""
+    """Owns the virtual joystick device and a steady-state write loop.
 
-    def __init__(self, device_name: str = "Joystick Linux Fake", update_rate_hz: int = 125) -> None:
+    Parameters
+    ----------
+    device_name:
+        Visible name for the virtual device.
+    update_rate_hz:
+        State-refresh rate in Hz.
+    config:
+        A ``JoyMappingConfig`` (from ``joystick_parser``) that defines the
+        axes and buttons exposed by the device.  When ``None`` the built-in
+        Xbox mapping is used.
+    """
+
+    def __init__(
+        self,
+        device_name: str = "Joystick Linux Fake",
+        update_rate_hz: int = 125,
+        config=None,
+    ) -> None:
         self.device_name = device_name
         self.update_rate_hz = update_rate_hz
+        self.config = config
+        self._axis_ranges: dict[str, tuple[int, int]] = (
+            axis_ranges_from_config(config) if config is not None else {}
+        )
         self._device: VirtualJoystickDevice | None = None
-        self._state = JoystickState.neutral()
+        self._state = self._make_neutral_state()
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def _make_neutral_state(self) -> JoystickState:
+        if self.config is not None:
+            return JoystickState(
+                axes=neutral_axes_from_config(self.config),
+                buttons=neutral_buttons_from_config(self.config),
+            )
+        return JoystickState.neutral()
+
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
-        self._device = VirtualJoystickDevice(name=self.device_name)
+        self._device = VirtualJoystickDevice(name=self.device_name, config=self.config)
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._write_loop, name="joystick-writer", daemon=True)
+        self._thread = threading.Thread(
+            target=self._write_loop, name="joystick-writer", daemon=True
+        )
         self._thread.start()
 
     def _write_loop(self) -> None:
@@ -53,17 +79,28 @@ class JoystickController:
             self._state = state.copy()
 
     def reset(self) -> None:
-        self.apply_state(JoystickState.neutral())
+        self.apply_state(self._make_neutral_state())
+
+    def _clamp_axis(self, axis_name: str, value: int) -> int:
+        """Clamp *value* to the configured range for *axis_name*."""
+        if self.config is not None:
+            low, high = self._axis_ranges.get(axis_name, (-32768, 32767))
+        else:
+            from .state import AXIS_RANGES
+            low, high = AXIS_RANGES.get(axis_name, (-32768, 32767))
+        return max(low, min(high, int(value)))
 
     def set_axis(self, axis_name: str, value: int) -> None:
         with self._lock:
-            self._state.axes[axis_name] = clamp_axis(axis_name, value)
+            self._state.axes[axis_name] = self._clamp_axis(axis_name, value)
 
     def set_button(self, button_name: str, pressed: bool) -> None:
         with self._lock:
             self._state.buttons[button_name] = bool(pressed)
 
-    def tap_buttons(self, button_names: tuple[str, ...], duration: float = 0.18) -> None:
+    def tap_buttons(
+        self, button_names: tuple[str, ...], duration: float = 0.18
+    ) -> None:
         with self._lock:
             previous = {name: self._state.buttons[name] for name in button_names}
             for name in button_names:
@@ -88,9 +125,11 @@ class JoystickController:
 
 
 class SimulationSession:
-    """Runs one simulation pattern at a time and feeds it into the controller."""
+    """Runs one simulation pattern and feeds it into the controller."""
 
-    def __init__(self, controller: JoystickController, update_rate_hz: int = 60) -> None:
+    def __init__(
+        self, controller: JoystickController, update_rate_hz: int = 60
+    ) -> None:
         self.controller = controller
         self.update_rate_hz = update_rate_hz
         self._stop_event = threading.Event()
