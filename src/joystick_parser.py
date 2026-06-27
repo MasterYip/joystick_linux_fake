@@ -52,7 +52,7 @@ JS_EVENT_INIT = 0x80
 # ---------------------------------------------------------------------------
 
 
-@dataclass(slots=True)
+@dataclass
 class AxisMapping:
     """Maps a physical axis number to a logical name and display label."""
 
@@ -62,7 +62,7 @@ class AxisMapping:
     max_val: int
 
 
-@dataclass(slots=True)
+@dataclass
 class ButtonMapping:
     """Maps a physical button number to a logical name and display label."""
 
@@ -70,7 +70,7 @@ class ButtonMapping:
     label: str
 
 
-@dataclass(slots=True)
+@dataclass
 class JoyMappingConfig:
     """Complete joystick mapping: axis + button number → logical name + label."""
 
@@ -320,7 +320,7 @@ def get_mapping(identifier: str) -> JoyMappingConfig:
 # ---------------------------------------------------------------------------
 
 
-@dataclass(slots=True)
+@dataclass
 class JoystickEvent:
     """A single parsed joystick event with mapped logical names."""
 
