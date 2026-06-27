@@ -89,7 +89,7 @@ class DeviceError(RuntimeError):
     """Raised when the virtual device cannot be created."""
 
 
-@dataclass(slots=True)
+@dataclass
 class CheckResult:
     label: str
     ok: bool

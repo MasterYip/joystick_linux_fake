@@ -108,7 +108,7 @@ def neutral_buttons_from_config(cfg) -> dict[str, bool]:
     return {bm.logical: False for bm in cfg.buttons.values()}
 
 
-@dataclass(slots=True)
+@dataclass
 class JoystickState:
     axes: dict[str, int] = field(default_factory=neutral_axes)
     buttons: dict[str, bool] = field(default_factory=neutral_buttons)
