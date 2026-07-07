@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         default=None,
-        help="Joystick mapping: 'xbox', 'ps5', or path to a YAML file.  Default: xbox (built-in).",
+        help="Joystick mapping: 'xbox', 'ps5', 'beitong_kp20', or path to a YAML file.  Default: xbox (built-in).",
     )
     return parser
 

@@ -1,0 +1,30 @@
+# Beitong Kunpeng 20 (北通鲲鹏20)
+name: "Beitong Kunpeng 20 (北通鲲鹏20)"
+version: 1
+
+axes:
+  0: {logical: left_x,  label: "Left Stick X",  min: -32768, max: 32767}
+  1: {logical: left_y,  label: "Left Stick Y",  min: -32768, max: 32767}
+  2: {logical: right_x, label: "Right Stick X", min: -32768, max: 32767}
+  3: {logical: right_y, label: "Right Stick Y", min: -32768, max: 32767}
+  4: {logical: r2,      label: "R2 Trigger",    min: 0,      max: 255}
+  5: {logical: l2,      label: "L2 Trigger",    min: 0,      max: 255}
+  6: {logical: dpad_x,  label: "D-Pad X",       min: -1,     max: 1}
+  7: {logical: dpad_y,  label: "D-Pad Y",       min: -1,     max: 1}
+
+buttons:
+  0: {logical: south,  label: "A"}
+  1: {logical: east,   label: "B"}
+  2: {logical: share,  label: "Share"}
+  3: {logical: west,   label: "X"}
+  4: {logical: north,  label: "Y"}
+  5: {logical: turbo,  label: "Turbo"}
+  6: {logical: l1,     label: "LB"}
+  7: {logical: r1,     label: "RB"}
+  8: {logical: mode,   label: "Guide"}
+  9: {logical: m1,     label: "M1"}
+  10: {logical: select, label: "Back"}
+  11: {logical: start, label: "Start"}
+  12: {logical: m2,    label: "M2"}
+  13: {logical: l3,    label: "L3"}
+  14: {logical: r3,    label: "R3"}

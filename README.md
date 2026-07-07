@@ -150,6 +150,7 @@ Select a different joystick type with `--config`:
 
 ```bash
 joystick-linux-fake --mode gui --config ps5
+joystick-linux-fake --mode gui --config beitong_kp20
 joystick-linux-fake --mode gui --config /path/to/custom.yaml
 ```
 
@@ -163,6 +164,7 @@ All CLI modes accept `--config` to choose a joystick mapping:
 # Built-in names
 joystick-linux-fake --mode idle --config xbox
 joystick-linux-fake --mode simulate --pattern circle --config ps5
+joystick-linux-fake --mode gui --config beitong_kp20
 
 # Custom YAML file
 joystick-linux-fake --mode simulate --pattern combo-demo --config my_controller.yaml
@@ -217,12 +219,14 @@ with JoystickParser("/dev/input/js0", mapping="xbox") as parser:
 |-----|-----------|--------:|-----:|
 | `xbox` | Xbox 360 / One / Series | 11 | 8 |
 | `ps5` | PS5 DualSense (hid-playstation) | 15 | 8 |
+| `beitong_kp20` | Beitong Kunpeng 20 (北通鲲鹏20) | 15 | 8 |
 
 ```python
 from joystick_parser import get_mapping
 
 cfg = get_mapping("xbox")                         # built-in, no filesystem hit
 cfg = get_mapping("ps5")                          # built-in
+cfg = get_mapping("beitong_kp20")                      # built-in
 cfg = get_mapping("/path/to/my_controller.yaml")  # custom YAML file
 ```
 
@@ -275,6 +279,7 @@ joystick-watch
 
 # Specify device and mapping
 joystick-watch --device /dev/input/js1 --config ps5
+joystick-watch --config beitong_kp20
 
 # Info-only modes
 joystick-watch --list-devices

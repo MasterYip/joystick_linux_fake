@@ -100,6 +100,26 @@ class BuiltinMappingsTests(unittest.TestCase):
         self.assertEqual(cfg.buttons[0].logical, "south")  # Cross
         self.assertEqual(cfg.buttons[3].logical, "north")  # Triangle
 
+    def test_beitong_kp20_builtin(self) -> None:
+        cfg = BUILTIN_MAPPINGS["beitong_kp20"]
+        self.assertEqual(cfg.name, "Beitong Kunpeng 20 (北通鲲鹏20)")
+        self.assertEqual(len(cfg.axes), 8)
+        self.assertEqual(len(cfg.buttons), 15)
+        # KP20-specific layout
+        self.assertEqual(cfg.axes[2].logical, "right_x")
+        self.assertEqual(cfg.axes[3].logical, "right_y")
+        self.assertEqual(cfg.axes[4].logical, "r2")
+        self.assertEqual(cfg.axes[5].logical, "l2")
+        self.assertEqual(cfg.buttons[0].logical, "south")   # A
+        self.assertEqual(cfg.buttons[3].logical, "west")    # X
+        self.assertEqual(cfg.buttons[4].logical, "north")   # Y
+        self.assertEqual(cfg.buttons[6].logical, "l1")      # LB
+        self.assertEqual(cfg.buttons[7].logical, "r1")      # RB
+        self.assertEqual(cfg.buttons[10].logical, "select") # Back
+        self.assertEqual(cfg.buttons[11].logical, "start")  # Start
+        self.assertEqual(cfg.buttons[13].logical, "l3")     # L-Thumb
+        self.assertEqual(cfg.buttons[14].logical, "r3")     # R-Thumb
+
 
 class GetMappingTests(unittest.TestCase):
     def test_builtin_xbox(self) -> None:
@@ -111,6 +131,11 @@ class GetMappingTests(unittest.TestCase):
         cfg = get_mapping("ps5")
         self.assertIsInstance(cfg, JoyMappingConfig)
         self.assertIn("PS5", cfg.name)
+
+    def test_builtin_beitong_kp20(self) -> None:
+        cfg = get_mapping("beitong_kp20")
+        self.assertIsInstance(cfg, JoyMappingConfig)
+        self.assertIn("Beitong Kunpeng", cfg.name)
 
     def test_unknown_raises(self) -> None:
         with self.assertRaises(ValueError):

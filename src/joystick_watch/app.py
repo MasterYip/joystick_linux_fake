@@ -378,12 +378,13 @@ class JoystickWatchApp:
         # Builtins first
         self._mapping_options.append(("Xbox (built-in)", "xbox", "builtin"))
         self._mapping_options.append(("PS5 (built-in)", "ps5", "builtin"))
+        self._mapping_options.append(("Beitong KP20 (built-in)", "beitong_kp20", "builtin"))
 
         # Filesystem YAML configs
         for display_name, path in discover_configs():
             # Avoid duplicates with builtins
             ident = os.path.splitext(os.path.basename(path))[0]
-            if ident in ("xbox", "ps5"):
+            if ident in ("xbox", "ps5", "beitong_kp20"):
                 display_name = f"{display_name} (YAML)"
             self._mapping_options.append((display_name, path, "file"))
 
@@ -568,7 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        help="Mapping to use: 'xbox', 'ps5', or a path to a YAML file.  Default: xbox.",
+        help="Mapping to use: 'xbox', 'ps5', 'beitong_kp20', or a path to a YAML file.  Default: xbox.",
         default="xbox",
     )
     parser.add_argument(
@@ -605,7 +606,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_mappings:
         print("Built-in mappings:")
-        for name in ("xbox", "ps5"):
+        for name in ("xbox", "ps5", "beitong_kp20"):
             cfg = get_mapping(name)
             print(f"  {name:8s}  {cfg.name}")
         print()

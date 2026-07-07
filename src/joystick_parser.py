@@ -196,9 +196,44 @@ def _ps5_mapping() -> JoyMappingConfig:
     )
 
 
+def _beitong_kp20_mapping() -> JoyMappingConfig:
+    return JoyMappingConfig(
+        name="Beitong Kunpeng 20 (北通鲲鹏20)",
+        version=1,
+        axes={
+            0: AxisMapping("left_x", "Left Stick X", -32768, 32767),
+            1: AxisMapping("left_y", "Left Stick Y", -32768, 32767),
+            2: AxisMapping("right_x", "Right Stick X", -32768, 32767),
+            3: AxisMapping("right_y", "Right Stick Y", -32768, 32767),
+            4: AxisMapping("r2", "R2 Trigger", 0, 255),
+            5: AxisMapping("l2", "L2 Trigger", 0, 255),
+            6: AxisMapping("dpad_x", "D-Pad X", -1, 1),
+            7: AxisMapping("dpad_y", "D-Pad Y", -1, 1),
+        },
+        buttons={
+            0: ButtonMapping("south", "A"),
+            1: ButtonMapping("east", "B"),
+            2: ButtonMapping("share", "Share"),
+            3: ButtonMapping("west", "X"),
+            4: ButtonMapping("north", "Y"),
+            5: ButtonMapping("turbo", "Turbo"),
+            6: ButtonMapping("l1", "LB"),
+            7: ButtonMapping("r1", "RB"),
+            8: ButtonMapping("mode", "Guide"),
+            9: ButtonMapping("m1", "M1"),
+            10: ButtonMapping("select", "Back"),
+            11: ButtonMapping("start", "Start"),
+            12: ButtonMapping("m2", "M2"),
+            13: ButtonMapping("l3", "L-Thumb"),
+            14: ButtonMapping("r3", "R-Thumb"),
+        },
+    )
+
+
 BUILTIN_MAPPINGS: dict[str, JoyMappingConfig] = {
     "xbox": _xbox_mapping(),
     "ps5": _ps5_mapping(),
+    "beitong_kp20": _beitong_kp20_mapping(),
 }
 """Hardcoded mappings for common controllers.  Use `get_mapping("xbox")` etc."""
 
@@ -293,7 +328,7 @@ def get_mapping(identifier: str) -> JoyMappingConfig:
     """Resolve a mapping identifier to a :class:`JoyMappingConfig`.
 
     Resolution order:
-    1. Built-in names: ``"xbox"``, ``"ps5"``
+    1. Built-in names: ``"xbox"``, ``"ps5"``, ``"beitong_kp20"``
     2. Filesystem path to a ``.yaml`` or ``.yml`` file
     3. Raise :class:`ValueError`
     """
