@@ -89,9 +89,11 @@ class JoyMappingConfigTests(unittest.TestCase):
         )
         cfg = JoyMappingConfig.from_file(config_path)
         self.assertIn("updated BLE firmware", cfg.name)
-        self.assertEqual(cfg.buttons[8].logical, "l3")
-        self.assertEqual(cfg.buttons[9].logical, "r3")
-        self.assertNotIn(10, cfg.buttons)
+        self.assertEqual(cfg.axes[2].logical, "right_x")
+        self.assertEqual(cfg.axes[4].logical, "r2")
+        self.assertEqual(cfg.buttons[13].logical, "l3")
+        self.assertEqual(cfg.buttons[14].logical, "r3")
+        self.assertEqual(cfg.buttons[10].logical, "button_10")
 
 
 class BuiltinMappingsTests(unittest.TestCase):
@@ -148,9 +150,11 @@ class BuiltinMappingsTests(unittest.TestCase):
     def test_xbox_new_builtin(self) -> None:
         cfg = BUILTIN_MAPPINGS["xbox_new"]
         self.assertEqual(len(cfg.axes), 8)
-        self.assertEqual(len(cfg.buttons), 10)
-        self.assertEqual(cfg.buttons[8].logical, "l3")
-        self.assertEqual(cfg.buttons[9].logical, "r3")
+        self.assertEqual(len(cfg.buttons), 14)
+        self.assertEqual(cfg.axes[2].logical, "right_x")
+        self.assertEqual(cfg.axes[5].logical, "l2")
+        self.assertEqual(cfg.buttons[13].logical, "l3")
+        self.assertEqual(cfg.buttons[14].logical, "r3")
 
     def test_beitong_kp20_builtin(self) -> None:
         cfg = BUILTIN_MAPPINGS["beitong_kp20"]
@@ -190,8 +194,8 @@ class GetMappingTests(unittest.TestCase):
         ):
             cfg = get_mapping("xbox_new")
         self.assertIn("updated BLE firmware", cfg.name)
-        self.assertEqual(cfg.buttons[8].logical, "l3")
-        self.assertEqual(cfg.buttons[9].logical, "r3")
+        self.assertEqual(cfg.buttons[13].logical, "l3")
+        self.assertEqual(cfg.buttons[14].logical, "r3")
 
     def test_builtin_beitong_kp20(self) -> None:
         cfg = get_mapping("beitong_kp20")

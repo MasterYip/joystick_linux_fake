@@ -52,8 +52,9 @@
  *  |         | right_x, right_y, r2,     | l1, r1, select, start, mode, |
  *  |         | dpad_x, dpad_y            | l3, r3                       |
  *  +---------+---------------------------+-------------------------------+
- *  |"xbox_new"| same axes as xbox         | south, east, west, north,    |
- *  |         |                           | l1, r1, select, start, l3, r3|
+ *  |"xbox_new"| left/right sticks,        | south, east, raw buttons,    |
+ *  |         | r2, l2, dpad_x, dpad_y   | west, north, select, l1, r1, |
+ *  |         |                           | start, l3, r3                |
  *  +---------+---------------------------+-------------------------------+
  *  | "ps5"   | left_x, left_y, right_x,  | south, east, west, north,    |
  *  |         | l2, right_y, r2,          | l1, r1, l2_btn, r2_btn,      |
@@ -388,17 +389,18 @@ inline const JoystickMappingConfig& xbox_new_mapping() {
         c.axes = {
             {0, "left_x",  -32768, 32767},
             {1, "left_y",  -32768, 32767},
-            {2, "l2",           0,   255},
-            {3, "right_x", -32768, 32767},
-            {4, "right_y", -32768, 32767},
-            {5, "r2",           0,   255},
+            {2, "right_x", -32768, 32767},
+            {3, "right_y", -32768, 32767},
+            {4, "r2",           0,   255},
+            {5, "l2",           0,   255},
             {6, "dpad_x",      -1,     1},
             {7, "dpad_y",      -1,     1},
         };
         c.buttons = {
-            {0, "south"}, {1, "east"}, {2, "west"}, {3, "north"},
-            {4, "l1"}, {5, "r1"}, {6, "select"}, {7, "start"},
-            {8, "l3"}, {9, "r3"},
+            {0, "south"}, {1, "east"}, {2, "button_13"}, {3, "west"},
+            {4, "north"}, {5, "select"}, {6, "l1"}, {7, "r1"},
+            {8, "button_14"}, {9, "start"}, {10, "button_10"},
+            {11, "button_11"}, {13, "l3"}, {14, "r3"},
         };
         return load_shared_preset_or("xbox_new", std::move(c));
     }();

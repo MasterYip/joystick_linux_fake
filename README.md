@@ -220,7 +220,7 @@ with JoystickParser("/dev/input/js0", mapping="xbox") as parser:
 | Key | Controller | Buttons | Axes |
 |-----|-----------|--------:|-----:|
 | `xbox` | Xbox wired or legacy firmware | 11 | 8 |
-| `xbox_new` | Xbox One / Series updated BLE firmware | 10 | 8 |
+| `xbox_new` | Xbox One / Series updated BLE firmware | 14 | 8 |
 | `ps5` | PS5 DualSense (hid-playstation) | 15 | 8 |
 | `beitong_kp20` | Beitong Kunpeng 20 (北通鲲鹏20) | 15 | 8 |
 
@@ -236,7 +236,7 @@ cfg = get_mapping("/path/to/my_controller.yaml")  # custom YAML file
 
 ### Shared Mapping Configs
 
-The canonical presets live in [`config/joystick_mappings`](config/joystick_mappings) and are shared by `joystick_watch`, `joystick-linux-fake`, and the C++ parser. `joystick_parser` also carries matching inline defaults, so named presets work when the standalone file is copied without the config folder or PyYAML. Choose `xbox_new` when updated Bluetooth firmware reports L3/R3 as joydev buttons 8/9; use `xbox` when Guide is button 8 and L3/R3 are 9/10.
+The canonical presets live in [`config/joystick_mappings`](config/joystick_mappings) and are shared by `joystick_watch`, `joystick-linux-fake`, and the C++ parser. `joystick_parser` also carries matching inline defaults, so named presets work when the standalone file is copied without the config folder or PyYAML. Choose `xbox_new` for the calibrated updated Bluetooth layout, where L3/R3 are joydev buttons 13/14; use `xbox` when Guide is button 8 and L3/R3 are 9/10.
 
 The shared YAML format is:
 
