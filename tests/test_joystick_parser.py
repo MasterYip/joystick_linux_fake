@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 # Ensure the src directory is importable
@@ -183,8 +184,11 @@ class GetMappingTests(unittest.TestCase):
         self.assertIsInstance(cfg, JoyMappingConfig)
         self.assertIn("PS5", cfg.name)
 
-    def test_builtin_xbox_new_uses_shared_config(self) -> None:
-        cfg = get_mapping("xbox_new")
+    def test_builtin_xbox_new_is_inlined(self) -> None:
+        with mock.patch.object(
+            jp, "_shipped_config_dir", side_effect=AssertionError("filesystem lookup")
+        ):
+            cfg = get_mapping("xbox_new")
         self.assertIn("updated BLE firmware", cfg.name)
         self.assertEqual(cfg.buttons[8].logical, "l3")
         self.assertEqual(cfg.buttons[9].logical, "r3")

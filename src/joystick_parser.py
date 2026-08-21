@@ -196,14 +196,32 @@ def _ps5_mapping() -> JoyMappingConfig:
 
 def _xbox_new_mapping() -> JoyMappingConfig:
     """Xbox layout exposed by joydev after the BLE firmware update."""
-    config = _xbox_mapping()
-    config.name = "Xbox One / Series (updated BLE firmware)"
-    config.buttons = {
-        **{number: button for number, button in config.buttons.items() if number < 8},
-        8: ButtonMapping("l3", "L-Thumb"),
-        9: ButtonMapping("r3", "R-Thumb"),
-    }
-    return config
+    return JoyMappingConfig(
+        name="Xbox One / Series (updated BLE firmware)",
+        version=1,
+        axes={
+            0: AxisMapping("left_x", "Left Stick X", -32768, 32767),
+            1: AxisMapping("left_y", "Left Stick Y", -32768, 32767),
+            2: AxisMapping("l2", "L2 Trigger", 0, 255),
+            3: AxisMapping("right_x", "Right Stick X", -32768, 32767),
+            4: AxisMapping("right_y", "Right Stick Y", -32768, 32767),
+            5: AxisMapping("r2", "R2 Trigger", 0, 255),
+            6: AxisMapping("dpad_x", "D-Pad X", -1, 1),
+            7: AxisMapping("dpad_y", "D-Pad Y", -1, 1),
+        },
+        buttons={
+            0: ButtonMapping("south", "A"),
+            1: ButtonMapping("east", "B"),
+            2: ButtonMapping("west", "X"),
+            3: ButtonMapping("north", "Y"),
+            4: ButtonMapping("l1", "LB"),
+            5: ButtonMapping("r1", "RB"),
+            6: ButtonMapping("select", "Back"),
+            7: ButtonMapping("start", "Start"),
+            8: ButtonMapping("l3", "L-Thumb"),
+            9: ButtonMapping("r3", "R-Thumb"),
+        },
+    )
 
 
 def _beitong_kp20_mapping() -> JoyMappingConfig:
@@ -352,22 +370,19 @@ def get_mapping(identifier: str) -> JoyMappingConfig:
     """Resolve a mapping identifier to a :class:`JoyMappingConfig`.
 
     Resolution order:
-    1. Shared preset files: ``"xbox"``, ``"xbox_new"``, ``"ps5"``, etc.
-    2. Hardcoded fallback for those preset names (standalone-file use)
+    1. Inlined presets: ``"xbox"``, ``"xbox_new"``, ``"ps5"``, etc.
+    2. Shared preset files
     3. Filesystem path to a ``.yaml`` or ``.yml`` file
     4. Raise :class:`ValueError`
     """
+    if identifier in BUILTIN_MAPPINGS:
+        return BUILTIN_MAPPINGS[identifier]
+
     shipped = _shipped_config_dir()
     if shipped is not None:
         preset_path = shipped / f"{identifier}.yaml"
         if preset_path.is_file():
-            try:
-                return JoyMappingConfig.from_file(preset_path)
-            except ImportError:
-                pass
-
-    if identifier in BUILTIN_MAPPINGS:
-        return BUILTIN_MAPPINGS[identifier]
+            return JoyMappingConfig.from_file(preset_path)
 
     # Try as a filesystem path.
     path = Path(identifier)
