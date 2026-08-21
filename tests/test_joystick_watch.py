@@ -27,6 +27,10 @@ class CliParserTests(unittest.TestCase):
         args = build_parser().parse_args(["--config", "ps5"])
         self.assertEqual(args.config, "ps5")
 
+    def test_updated_xbox_config_flag(self) -> None:
+        args = build_parser().parse_args(["--config", "xbox_new"])
+        self.assertEqual(args.config, "xbox_new")
+
     def test_list_devices_flag(self) -> None:
         args = build_parser().parse_args(["--list-devices"])
         self.assertTrue(args.list_devices)

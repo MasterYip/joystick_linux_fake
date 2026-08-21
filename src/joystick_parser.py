@@ -30,6 +30,7 @@ from __future__ import annotations
 import glob
 import os
 import struct
+import sys
 import threading
 import time
 from collections import deque
@@ -108,11 +109,8 @@ class JoyMappingConfig:
 
     @staticmethod
     def from_file(path: str | Path) -> "JoyMappingConfig":
-        """Parse a YAML mapping file and return a JoyMappingConfig.
-
-        Requires PyYAML.  Raises ImportError with a clear message if it is
-        not installed.
-        """
+        """Parse a YAML mapping file and return a JoyMappingConfig."""
+        path = Path(path)
         try:
             import yaml
         except ImportError:
@@ -121,7 +119,7 @@ class JoyMappingConfig:
                 "Install it with:  pip install pyyaml"
             ) from None
 
-        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ValueError(f"Invalid mapping file: {path} (expected a YAML dict)")
         return JoyMappingConfig.from_dict(raw)
@@ -196,6 +194,18 @@ def _ps5_mapping() -> JoyMappingConfig:
     )
 
 
+def _xbox_new_mapping() -> JoyMappingConfig:
+    """Xbox layout exposed by joydev after the BLE firmware update."""
+    config = _xbox_mapping()
+    config.name = "Xbox One / Series (updated BLE firmware)"
+    config.buttons = {
+        **{number: button for number, button in config.buttons.items() if number < 8},
+        8: ButtonMapping("l3", "L-Thumb"),
+        9: ButtonMapping("r3", "R-Thumb"),
+    }
+    return config
+
+
 def _beitong_kp20_mapping() -> JoyMappingConfig:
     return JoyMappingConfig(
         name="Beitong Kunpeng 20 (北通鲲鹏20)",
@@ -232,6 +242,7 @@ def _beitong_kp20_mapping() -> JoyMappingConfig:
 
 BUILTIN_MAPPINGS: dict[str, JoyMappingConfig] = {
     "xbox": _xbox_mapping(),
+    "xbox_new": _xbox_new_mapping(),
     "ps5": _ps5_mapping(),
     "beitong_kp20": _beitong_kp20_mapping(),
 }
@@ -243,18 +254,27 @@ BUILTIN_MAPPINGS: dict[str, JoyMappingConfig] = {
 
 
 def _shipped_config_dir() -> Path | None:
-    """Path to the shipped ``configs/joystick_mappings/`` directory.
+    """Path to the shared ``config/joystick_mappings/`` directory.
 
     Returns ``None`` when running from a zip / the directory doesn't exist.
     """
-    candidate = Path(__file__).resolve().parent / "configs" / "joystick_mappings"
-    if candidate.is_dir():
-        return candidate
-    # Fallback for when joystick_parser.py is used standalone (not in the
-    # joystick_watch package tree): search relative to CWD.
-    cwd_candidate = Path("configs/joystick_mappings")
-    if cwd_candidate.is_dir():
-        return cwd_candidate.resolve()
+    candidates = (
+        *(
+            (Path(os.environ["JOYSTICK_MAPPING_DIR"]),)
+            if "JOYSTICK_MAPPING_DIR" in os.environ
+            else ()
+        ),
+        Path(__file__).resolve().parents[1] / "config" / "joystick_mappings",
+        Path("config/joystick_mappings"),
+        Path(sys.prefix)
+        / "share"
+        / "joystick-linux-fake"
+        / "config"
+        / "joystick_mappings",
+    )
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate.resolve()
     return None
 
 
@@ -268,12 +288,11 @@ def discover_configs(search_paths: list[str] | None = None) -> list[tuple[str, s
     """Scan config directories for YAML mapping files.
 
     Returns a list of ``(display_name, file_path)`` pairs.  The display name
-    is read from the YAML ``name`` field when possible; otherwise the stem of
-    the filename is used.
+    is read from the config when possible; otherwise the filename stem is used.
 
     Directories scanned (in order):
     * *search_paths* (when provided)
-    * The shipped ``configs/joystick_mappings/`` directory (if it exists)
+    * The shared ``config/joystick_mappings/`` directory (if it exists)
     * ``~/.config/joystick_watch/mappings/``
     """
     dirs: list[Path] = [Path(p) for p in (search_paths or [])]
@@ -288,14 +307,19 @@ def discover_configs(search_paths: list[str] | None = None) -> list[tuple[str, s
     for directory in dirs:
         if not directory.is_dir():
             continue
-        for yaml_path in sorted(directory.glob("*.yaml")):
-            yaml_path_str = str(yaml_path)
-            if yaml_path_str in seen:
+        config_paths = sorted(directory.glob("*.yaml")) + sorted(
+            directory.glob("*.yml")
+        )
+        for config_path in config_paths:
+            config_path_str = str(config_path)
+            if config_path_str in seen:
                 continue
-            seen.add(yaml_path_str)
-            # Try to extract the display name from the YAML without heavy parsing.
-            display = _read_yaml_name(yaml_path) or yaml_path.stem
-            results.append((display, yaml_path_str))
+            seen.add(config_path_str)
+            try:
+                display = JoyMappingConfig.from_file(config_path).name
+            except (ImportError, OSError, ValueError):
+                display = _read_yaml_name(config_path) or config_path.stem
+            results.append((display, config_path_str))
 
     return results
 
@@ -328,17 +352,31 @@ def get_mapping(identifier: str) -> JoyMappingConfig:
     """Resolve a mapping identifier to a :class:`JoyMappingConfig`.
 
     Resolution order:
-    1. Built-in names: ``"xbox"``, ``"ps5"``, ``"beitong_kp20"``
-    2. Filesystem path to a ``.yaml`` or ``.yml`` file
-    3. Raise :class:`ValueError`
+    1. Shared preset files: ``"xbox"``, ``"xbox_new"``, ``"ps5"``, etc.
+    2. Hardcoded fallback for those preset names (standalone-file use)
+    3. Filesystem path to a ``.yaml`` or ``.yml`` file
+    4. Raise :class:`ValueError`
     """
+    shipped = _shipped_config_dir()
+    if shipped is not None:
+        preset_path = shipped / f"{identifier}.yaml"
+        if preset_path.is_file():
+            try:
+                return JoyMappingConfig.from_file(preset_path)
+            except ImportError:
+                pass
+
     if identifier in BUILTIN_MAPPINGS:
         return BUILTIN_MAPPINGS[identifier]
 
     # Try as a filesystem path.
     path = Path(identifier)
     if not path.exists():
-        path = Path(identifier + ".yaml")
+        for suffix in (".yaml", ".yml"):
+            candidate = Path(identifier + suffix)
+            if candidate.is_file():
+                path = candidate
+                break
     if path.is_file():
         return JoyMappingConfig.from_file(path)
 
@@ -394,8 +432,8 @@ class JoystickParser:
         Path to the joystick device, e.g. ``"/dev/input/js0"``.
     mapping:
         Either a :class:`JoyMappingConfig` instance, or a string identifier.
-        Strings are resolved by :func:`get_mapping` (builtin ``"xbox"`` /
-        ``"ps5"``, or path to a YAML file).
+        Strings are resolved by :func:`get_mapping` (preset ``"xbox"``,
+        ``"xbox_new"``, ``"ps5"``, or a config file path).
     max_event_queue:
         Maximum number of events to buffer.  Older events are dropped when
         the buffer is full (protects against memory growth when the consumer

@@ -14,7 +14,7 @@ This project provides three tools:
 | Tool | Purpose |
 |------|---------|
 | `joystick-linux-fake` | Create a **virtual** gamepad via `evdev.UInput` for local testing when a real controller isn't available. |
-| `joystick_parser` | **Standalone single-file module** — drop it into any project to read real or virtual joystick input. Built-in Xbox / PS5 mappings with YAML config support. |
+| `joystick_parser` | **Standalone single-file module** — drop it into any project to read real or virtual joystick input. Shared Xbox / PS5 presets with YAML config support. |
 | `joystick_watch` | **Tkinter GUI** for real-time joystick visualization. Axis progress bars, button indicators, and a live event log. |
 
 All three work together: create a virtual gamepad with `joystick-linux-fake`, then watch its output with `joystick_watch`, or parse its events programmatically with `joystick_parser`.
@@ -150,6 +150,7 @@ Select a different joystick type with `--config`:
 
 ```bash
 joystick-linux-fake --mode gui --config ps5
+joystick-linux-fake --mode gui --config xbox_new
 joystick-linux-fake --mode gui --config beitong_kp20
 joystick-linux-fake --mode gui --config /path/to/custom.yaml
 ```
@@ -163,6 +164,7 @@ All CLI modes accept `--config` to choose a joystick mapping:
 ```bash
 # Built-in names
 joystick-linux-fake --mode idle --config xbox
+joystick-linux-fake --mode idle --config xbox_new
 joystick-linux-fake --mode simulate --pattern circle --config ps5
 joystick-linux-fake --mode gui --config beitong_kp20
 
@@ -195,7 +197,7 @@ joystick-linux-fake --mode simulate --device-name "CI Test Gamepad"
 
 ## joystick_parser
 
-[`src/joystick_parser.py`](src/joystick_parser.py) is a **standalone single-file module** — drop it into any project that needs to read joystick input on Linux. It reads raw `/dev/input/js*` events and maps them through built-in or YAML configs.
+[`src/joystick_parser.py`](src/joystick_parser.py) is a **standalone single-file module** — drop it into any project that needs to read joystick input on Linux. It reads raw `/dev/input/js*` events and maps them through shared YAML presets or custom YAML configs.
 
 Zero dependencies beyond the standard library. PyYAML is optional (only needed when loading custom `.yaml` mapping files).
 
@@ -204,7 +206,7 @@ Zero dependencies beyond the standard library. PyYAML is optional (only needed w
 ```python
 from joystick_parser import JoystickParser
 
-# Use a built-in mapping — no config file needed
+# Use a named preset (with a compiled fallback for standalone use)
 with JoystickParser("/dev/input/js0", mapping="xbox") as parser:
     snap = parser.get_snapshot()
     print(snap.axes["left_x"], snap.buttons["south"])  # 0, False
@@ -217,17 +219,42 @@ with JoystickParser("/dev/input/js0", mapping="xbox") as parser:
 
 | Key | Controller | Buttons | Axes |
 |-----|-----------|--------:|-----:|
-| `xbox` | Xbox 360 / One / Series | 11 | 8 |
+| `xbox` | Xbox wired or legacy firmware | 11 | 8 |
+| `xbox_new` | Xbox One / Series updated BLE firmware | 10 | 8 |
 | `ps5` | PS5 DualSense (hid-playstation) | 15 | 8 |
 | `beitong_kp20` | Beitong Kunpeng 20 (北通鲲鹏20) | 15 | 8 |
 
 ```python
 from joystick_parser import get_mapping
 
-cfg = get_mapping("xbox")                         # built-in, no filesystem hit
+cfg = get_mapping("xbox")                         # wired / legacy firmware
+cfg = get_mapping("xbox_new")                     # updated BLE firmware
 cfg = get_mapping("ps5")                          # built-in
-cfg = get_mapping("beitong_kp20")                      # built-in
+cfg = get_mapping("beitong_kp20")                 # built-in fallback
 cfg = get_mapping("/path/to/my_controller.yaml")  # custom YAML file
+```
+
+### Shared Mapping Configs
+
+The canonical presets live in [`config/joystick_mappings`](config/joystick_mappings) and are shared by `joystick_parser`, `joystick_watch`, `joystick-linux-fake`, and the C++ parser. Choose `xbox_new` when updated Bluetooth firmware reports L3/R3 as joydev buttons 8/9; use `xbox` when Guide is button 8 and L3/R3 are 9/10.
+
+The shared YAML format is:
+
+```yaml
+name: Custom Gamepad
+version: 1
+
+axes:
+  0:
+    logical: left_x
+    label: Left Stick X
+    min: -32768
+    max: 32767
+
+buttons:
+  0:
+    logical: south
+    label: A
 ```
 
 ### Custom YAML Mappings
@@ -256,7 +283,7 @@ Place YAML files in `~/.config/joystick_watch/mappings/` or pass an absolute pat
 
 | Method | Description |
 |--------|-------------|
-| `JoystickParser(device_path, mapping)` | Create a parser. `mapping` is `"xbox"`, `"ps5"`, a `JoyMappingConfig`, or a YAML path. |
+| `JoystickParser(device_path, mapping)` | Create a parser. `mapping` is a preset name, `JoyMappingConfig`, or YAML path. |
 | `parser.start()` / `parser.stop()` | Start / stop the background reader thread. |
 | `parser.get_snapshot() -> JoystickSnapshot` | Thread-safe copy of current axes and button state. |
 | `parser.drain_events() -> list[JoystickEvent]` | Atomically drain the event queue (for polling consumers). |
@@ -279,6 +306,7 @@ joystick-watch
 
 # Specify device and mapping
 joystick-watch --device /dev/input/js1 --config ps5
+joystick-watch --config xbox_new
 joystick-watch --config beitong_kp20
 
 # Info-only modes
@@ -301,8 +329,8 @@ PYTHONPATH=src python -m joystick_watch --list-mappings
 
 The mapping dropdown shows:
 
-1. **Built-in** `xbox` and `ps5` mappings (no filesystem required)
-2. **YAML files** discovered from the shipped `configs/joystick_mappings/` directory and `~/.config/joystick_watch/mappings/`
+1. Named presets from the shared root config: `xbox`, `xbox_new`, `ps5`, and `beitong_kp20`
+2. Additional YAML files discovered from `~/.config/joystick_watch/mappings/`
 
 Select a different mapping at any time before starting — the panels rebuild automatically.
 
@@ -352,10 +380,18 @@ joystick-linux-fake --mode idle    # creates /dev/input/js* if missing
 ├── dummy_joystick.py
 ├── watch_js.py                           # Lightweight CLI watcher
 ├── pyproject.toml
+├── config/
+│   └── joystick_mappings/              # Shared Python/C++ preset files
+│       ├── xbox.yaml
+│       ├── xbox_new.yaml
+│       ├── ps5.yaml
+│       └── beitong_kp20.yaml
 ├── requirements.txt
 ├── setup.py
 ├── src/
 │   ├── joystick_parser.py                # Standalone event reader (no deps)
+│   ├── joystick_parser_cpp/
+│   │   └── joystick_parser.hpp           # Header-only C++17 parser
 │   ├── joystick_linux_fake/              # Virtual gamepad package
 │   │   ├── cli.py
 │   │   ├── controller.py
@@ -366,11 +402,7 @@ joystick-linux-fake --mode idle    # creates /dev/input/js* if missing
 │   └── joystick_watch/                   # Visualization GUI
 │       ├── __init__.py
 │       ├── __main__.py
-│       ├── app.py
-│       └── configs/
-│           └── joystick_mappings/
-│               ├── xbox.yaml
-│               └── ps5.yaml
+│       └── app.py
 └── tests/
     ├── test_cli.py
     ├── test_simulations.py
@@ -398,4 +430,4 @@ PYTHONPATH=src python -m unittest discover -s tests
 
 - Built with [`python-evdev`](https://python-evdev.readthedocs.io/)
 - Inspired by the Linux `joystick` and `evtest` tools
-- Uses PyYAML for external mapping configs
+- Uses YAML for shared presets and custom mapping configs

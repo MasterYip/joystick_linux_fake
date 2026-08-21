@@ -33,5 +33,12 @@ classifiers = [
 joystick-linux-fake = "joystick_linux_fake.cli:main"
 joystick-watch = "joystick_watch.app:main"
 
+[tool.setuptools]
+py-modules = ["joystick_parser"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/joystick-linux-fake/config/joystick_mappings" = ["config/joystick_mappings/*.yaml"]
+"share/joystick-linux-fake/include" = ["src/joystick_parser_cpp/joystick_parser.hpp"]

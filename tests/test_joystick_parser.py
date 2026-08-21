@@ -78,8 +78,52 @@ class JoyMappingConfigTests(unittest.TestCase):
         finally:
             os.unlink(tmp_path)
 
+    def test_from_shared_yaml_file(self) -> None:
+        config_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "config",
+            "joystick_mappings",
+            "xbox_new.yaml",
+        )
+        cfg = JoyMappingConfig.from_file(config_path)
+        self.assertIn("updated BLE firmware", cfg.name)
+        self.assertEqual(cfg.buttons[8].logical, "l3")
+        self.assertEqual(cfg.buttons[9].logical, "r3")
+        self.assertNotIn(10, cfg.buttons)
+
 
 class BuiltinMappingsTests(unittest.TestCase):
+    def test_shared_presets_match_compiled_fallbacks(self) -> None:
+        config_dir = os.path.join(
+            os.path.dirname(__file__), "..", "config", "joystick_mappings"
+        )
+        for identifier, fallback in BUILTIN_MAPPINGS.items():
+            with self.subTest(identifier=identifier):
+                shared = JoyMappingConfig.from_file(
+                    os.path.join(config_dir, f"{identifier}.yaml")
+                )
+                self.assertEqual(
+                    {
+                        number: (axis.logical, axis.label, axis.min_val, axis.max_val)
+                        for number, axis in shared.axes.items()
+                    },
+                    {
+                        number: (axis.logical, axis.label, axis.min_val, axis.max_val)
+                        for number, axis in fallback.axes.items()
+                    },
+                )
+                self.assertEqual(
+                    {
+                        number: (button.logical, button.label)
+                        for number, button in shared.buttons.items()
+                    },
+                    {
+                        number: (button.logical, button.label)
+                        for number, button in fallback.buttons.items()
+                    },
+                )
+
     def test_xbox_builtin(self) -> None:
         cfg = BUILTIN_MAPPINGS["xbox"]
         self.assertEqual(cfg.name, "Xbox 360 / One / Series")
@@ -99,6 +143,13 @@ class BuiltinMappingsTests(unittest.TestCase):
         self.assertGreaterEqual(len(cfg.buttons), 14)
         self.assertEqual(cfg.buttons[0].logical, "south")  # Cross
         self.assertEqual(cfg.buttons[3].logical, "north")  # Triangle
+
+    def test_xbox_new_builtin(self) -> None:
+        cfg = BUILTIN_MAPPINGS["xbox_new"]
+        self.assertEqual(len(cfg.axes), 8)
+        self.assertEqual(len(cfg.buttons), 10)
+        self.assertEqual(cfg.buttons[8].logical, "l3")
+        self.assertEqual(cfg.buttons[9].logical, "r3")
 
     def test_beitong_kp20_builtin(self) -> None:
         cfg = BUILTIN_MAPPINGS["beitong_kp20"]
@@ -131,6 +182,12 @@ class GetMappingTests(unittest.TestCase):
         cfg = get_mapping("ps5")
         self.assertIsInstance(cfg, JoyMappingConfig)
         self.assertIn("PS5", cfg.name)
+
+    def test_builtin_xbox_new_uses_shared_config(self) -> None:
+        cfg = get_mapping("xbox_new")
+        self.assertIn("updated BLE firmware", cfg.name)
+        self.assertEqual(cfg.buttons[8].logical, "l3")
+        self.assertEqual(cfg.buttons[9].logical, "r3")
 
     def test_builtin_beitong_kp20(self) -> None:
         cfg = get_mapping("beitong_kp20")
@@ -168,6 +225,11 @@ class DiscoverConfigsTests(unittest.TestCase):
         for display, path in configs:
             self.assertIsInstance(display, str)
             self.assertIsInstance(path, str)
+
+    def test_discovers_root_shared_presets(self) -> None:
+        paths = {os.path.basename(path) for _display, path in discover_configs()}
+        self.assertIn("xbox.yaml", paths)
+        self.assertIn("xbox_new.yaml", paths)
 
 
 # ---------------------------------------------------------------------------

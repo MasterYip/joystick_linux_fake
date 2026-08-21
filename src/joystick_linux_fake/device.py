@@ -17,11 +17,11 @@ from .state import JoystickState
 # ---------------------------------------------------------------------------
 
 def _get_default_config():
-    """Return the hardcoded Xbox mapping used when no config is provided."""
+    """Return the shared Xbox preset used when no config is provided."""
     try:
-        from joystick_parser import BUILTIN_MAPPINGS
+        from joystick_parser import get_mapping
 
-        return BUILTIN_MAPPINGS["xbox"]
+        return get_mapping("xbox")
     except ImportError:
         # Fallback: build a minimal Xbox-like config inline so the package
         # does not strictly require joystick_parser at import time.

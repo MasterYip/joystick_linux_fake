@@ -26,6 +26,7 @@ except ImportError:
     import joystick_parser as _jp  # type: ignore[no-redef]
 
 from joystick_parser import (
+    BUILTIN_MAPPINGS,
     JoyMappingConfig,
     JoystickEvent,
     JoystickParser,
@@ -376,16 +377,16 @@ class JoystickWatchApp:
         self._mapping_options = []
 
         # Builtins first
-        self._mapping_options.append(("Xbox (built-in)", "xbox", "builtin"))
+        self._mapping_options.append(("Xbox wired / legacy", "xbox", "builtin"))
+        self._mapping_options.append(("Xbox updated BLE firmware", "xbox_new", "builtin"))
         self._mapping_options.append(("PS5 (built-in)", "ps5", "builtin"))
         self._mapping_options.append(("Beitong KP20 (built-in)", "beitong_kp20", "builtin"))
 
-        # Filesystem YAML configs
+        # Additional filesystem configs
         for display_name, path in discover_configs():
-            # Avoid duplicates with builtins
             ident = os.path.splitext(os.path.basename(path))[0]
-            if ident in ("xbox", "ps5", "beitong_kp20"):
-                display_name = f"{display_name} (YAML)"
+            if ident in BUILTIN_MAPPINGS:
+                continue
             self._mapping_options.append((display_name, path, "file"))
 
         labels = [label for label, _, _ in self._mapping_options]
@@ -569,7 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--config",
-        help="Mapping to use: 'xbox', 'ps5', 'beitong_kp20', or a path to a YAML file.  Default: xbox.",
+        help="Mapping to use: 'xbox', 'xbox_new', 'ps5', 'beitong_kp20', or a config file path. Default: xbox.",
         default="xbox",
     )
     parser.add_argument(
@@ -606,17 +607,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_mappings:
         print("Built-in mappings:")
-        for name in ("xbox", "ps5", "beitong_kp20"):
+        for name in BUILTIN_MAPPINGS:
             cfg = get_mapping(name)
             print(f"  {name:8s}  {cfg.name}")
         print()
         print("Filesystem mappings:")
-        discovered = discover_configs()
+        discovered = [
+            (display, path)
+            for display, path in discover_configs()
+            if os.path.splitext(os.path.basename(path))[0] not in BUILTIN_MAPPINGS
+        ]
         if discovered:
             for display, path in discovered:
                 print(f"  {display:<30s}  {path}")
         else:
-            print("  (none found — place .yaml files in ~/.config/joystick_watch/mappings/)")
+            print("  (none found - place .yaml files in ~/.config/joystick_watch/mappings/)")
         return 0
 
     # -- GUI mode --

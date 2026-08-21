@@ -12,6 +12,10 @@ class CliParserTests(unittest.TestCase):
         self.assertEqual(args.pattern, "circle")
         self.assertEqual(args.update_rate, 125)
 
+    def test_updated_xbox_config_flag(self) -> None:
+        args = build_parser().parse_args(["--config", "xbox_new"])
+        self.assertEqual(args.config, "xbox_new")
+
 
 if __name__ == "__main__":
     unittest.main()
