@@ -1,8 +1,5 @@
 name: Xbox One / Series (updated BLE firmware)
 version: 1
-
-# Updated BLE firmware does not expose Guide or Share through Linux joydev.
-# The thumb-click buttons therefore move from 9/10 to 8/9.
 axes:
   0:
     logical: left_x
@@ -15,23 +12,23 @@ axes:
     min: -32768
     max: 32767
   2:
-    logical: l2
-    label: L2 Trigger
-    min: 0
-    max: 255
-  3:
     logical: right_x
     label: Right Stick X
     min: -32768
     max: 32767
-  4:
+  3:
     logical: right_y
     label: Right Stick Y
     min: -32768
     max: 32767
-  5:
+  4:
     logical: r2
     label: R2 Trigger
+    min: 0
+    max: 255
+  5:
+    logical: l2
+    label: L2 Trigger
     min: 0
     max: 255
   6:
@@ -44,7 +41,6 @@ axes:
     label: D-Pad Y
     min: -1
     max: 1
-
 buttons:
   0:
     logical: south
@@ -53,26 +49,38 @@ buttons:
     logical: east
     label: B
   2:
+    logical: button_13
+    label: Button 13
+  3:
     logical: west
     label: X
-  3:
+  4:
     logical: north
     label: Y
-  4:
-    logical: l1
-    label: LB
   5:
-    logical: r1
-    label: RB
-  6:
     logical: select
     label: Back
+  6:
+    logical: l1
+    label: LB
   7:
+    logical: r1
+    label: RB
+  8:
+    logical: button_14
+    label: Button 14
+  9:
     logical: start
     label: Start
-  8:
+  10:
+    logical: button_10
+    label: Button 10
+  11:
+    logical: button_11
+    label: Button 11
+  13:
     logical: l3
     label: L-Thumb
-  9:
+  14:
     logical: r3
     label: R-Thumb

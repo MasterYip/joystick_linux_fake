@@ -8,10 +8,14 @@ parser at ~60 fps via ``root.after()`` — zero cross-thread widget access.
 from __future__ import annotations
 
 import argparse
+import copy
 import os
+import re
 import sys
 import tkinter as tk
-from tkinter import messagebox, ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from typing import TypeVar
 
 # ---------------------------------------------------------------------------
 # Resolve the standalone parser module regardless of install layout.
@@ -26,7 +30,9 @@ except ImportError:
     import joystick_parser as _jp  # type: ignore[no-redef]
 
 from joystick_parser import (
+    AxisMapping,
     BUILTIN_MAPPINGS,
+    ButtonMapping,
     JoyMappingConfig,
     JoystickEvent,
     JoystickParser,
@@ -47,6 +53,48 @@ def _axis_percent(value: int, min_val: int, max_val: int) -> float:
     if span == 0:
         return 0.0
     return max(0.0, min(100.0, (value - min_val) / span * 100.0))
+
+
+_MappingT = TypeVar("_MappingT")
+
+
+def reorder_mapping_slots(
+    mappings: dict[int, _MappingT], source_index: int, target_index: int
+) -> dict[int, _MappingT]:
+    """Move one assignment in physical-slot order, preserving slot numbers.
+
+    Calibration changes which logical control belongs to each raw physical
+    number.  The physical numbers themselves are device facts and therefore
+    remain fixed while their assignments are reordered.
+    """
+    slots = sorted(mappings)
+    if not (0 <= source_index < len(slots) and 0 <= target_index < len(slots)):
+        return dict(mappings)
+    assignments = [mappings[number] for number in slots]
+    assignment = assignments.pop(source_index)
+    assignments.insert(target_index, assignment)
+    return dict(zip(slots, assignments))
+
+
+def mapping_to_dict(config: JoyMappingConfig) -> dict:
+    """Return a YAML-ready representation of a joystick mapping."""
+    return {
+        "name": config.name,
+        "version": config.version,
+        "axes": {
+            number: {
+                "logical": mapping.logical,
+                "label": mapping.label,
+                "min": mapping.min_val,
+                "max": mapping.max_val,
+            }
+            for number, mapping in sorted(config.axes.items())
+        },
+        "buttons": {
+            number: {"logical": mapping.logical, "label": mapping.label}
+            for number, mapping in sorted(config.buttons.items())
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +129,17 @@ class JoystickWatchApp:
         # Per-button widgets: logical_name → {"var": BooleanVar, "frame": Frame, "label": Label}
         self._button_widgets: dict[str, dict] = {}
 
+        # Calibration keeps a separate draft until Apply is pressed.
+        self._calibration_draft: JoyMappingConfig | None = None
+        self._calibration_trees: dict[str, ttk.Treeview] = {}
+        self._calibration_drag: tuple[str, str] | None = None
+
         # UI containers (populated by _build_*)
         self._toolbar: ttk.Frame | None = None
         self._axis_container: ttk.Frame | None = None
         self._button_container: ttk.Frame | None = None
+        self._main_content: ttk.Frame | None = None
+        self._calibration_panel: ttk.LabelFrame | None = None
         self._log_widget: tk.Text | None = None
 
         self._build_ui()
@@ -144,10 +199,18 @@ class JoystickWatchApp:
             row=0, column=7
         )
 
+        self._calibration_mode = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            toolbar,
+            text="Calibration mode",
+            variable=self._calibration_mode,
+            command=self._toggle_calibration,
+        ).grid(row=0, column=8, padx=(12, 0))
+
         # Status
         self._status_var = tk.StringVar(value="Ready.  Select a device and mapping, then Start.")
         ttk.Label(toolbar, textvariable=self._status_var).grid(
-            row=1, column=0, columnspan=8, sticky="w", pady=(6, 0)
+            row=1, column=0, columnspan=9, sticky="w", pady=(6, 0)
         )
 
     # -- main content --------------------------------------------------
@@ -155,8 +218,10 @@ class JoystickWatchApp:
     def _build_main_content(self) -> None:
         main = ttk.Frame(self.root, padding=(12, 0, 12, 12))
         main.grid(row=1, column=0, sticky="nsew")
+        self._main_content = main
         main.columnconfigure(0, weight=3)  # axes
         main.columnconfigure(1, weight=2)  # buttons
+        main.columnconfigure(2, weight=0)  # calibration (hidden initially)
         main.rowconfigure(0, weight=1)
 
         # ---- axes panel ----------------------------------------------
@@ -218,6 +283,80 @@ class JoystickWatchApp:
 
         btn_canvas.bind("<Enter>", lambda e: btn_canvas.bind_all("<MouseWheel>", _on_mousewheel_btns))
         btn_canvas.bind("<Leave>", lambda e: btn_canvas.unbind_all("<MouseWheel>"))
+
+        self._build_calibration_panel(main)
+
+    def _build_calibration_panel(self, parent: ttk.Frame) -> None:
+        panel = ttk.LabelFrame(parent, text="Calibration", padding=8)
+        panel.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
+        panel.columnconfigure(0, weight=1)
+        panel.rowconfigure(2, weight=1)
+        panel.rowconfigure(4, weight=1)
+        self._calibration_panel = panel
+
+        ttk.Label(
+            panel,
+            text="Move a control, then drag its assignment to the\n"
+            "highlighted raw slot. Physical # stays fixed.",
+            justify="left",
+        ).grid(row=0, column=0, sticky="w", pady=(0, 6))
+
+        ttk.Label(panel, text="Axes", anchor="w").grid(row=1, column=0, sticky="ew")
+        self._calibration_trees["axis"] = self._make_calibration_tree(panel, 2, "axis")
+        ttk.Label(panel, text="Buttons", anchor="w").grid(
+            row=3, column=0, sticky="ew", pady=(8, 0)
+        )
+        self._calibration_trees["button"] = self._make_calibration_tree(panel, 4, "button")
+
+        name_frame = ttk.Frame(panel)
+        name_frame.grid(row=5, column=0, sticky="ew", pady=(8, 4))
+        name_frame.columnconfigure(1, weight=1)
+        ttk.Label(name_frame, text="Name:").grid(row=0, column=0, padx=(0, 4))
+        self._calibration_name = tk.StringVar()
+        ttk.Entry(name_frame, textvariable=self._calibration_name).grid(
+            row=0, column=1, sticky="ew"
+        )
+
+        actions = ttk.Frame(panel)
+        actions.grid(row=6, column=0, sticky="ew")
+        ttk.Button(actions, text="Reset", command=self._reset_calibration).pack(
+            side="left"
+        )
+        ttk.Button(actions, text="Apply", command=self._apply_calibration).pack(
+            side="left", padx=4
+        )
+        ttk.Button(actions, text="Save YAML…", command=self._save_calibration).pack(
+            side="right"
+        )
+        panel.grid_remove()
+
+    def _make_calibration_tree(
+        self, parent: ttk.Frame, row: int, event_type: str
+    ) -> ttk.Treeview:
+        tree = ttk.Treeview(
+            parent,
+            columns=("number", "assignment", "value"),
+            show="headings",
+            height=7,
+            selectmode="browse",
+        )
+        tree.heading("number", text="Raw #")
+        tree.heading("assignment", text="Assignment (drag)")
+        tree.heading("value", text="Value")
+        tree.column("number", width=48, anchor="center", stretch=False)
+        tree.column("assignment", width=150, anchor="w")
+        tree.column("value", width=64, anchor="e", stretch=False)
+        tree.tag_configure("changed", background="#ffe08a", foreground="#111111")
+        tree.grid(row=row, column=0, sticky="nsew")
+        tree.bind(
+            "<ButtonPress-1>",
+            lambda event, kind=event_type: self._calibration_drag_start(event, kind),
+        )
+        tree.bind(
+            "<ButtonRelease-1>",
+            lambda event, kind=event_type: self._calibration_drag_end(event, kind),
+        )
+        return tree
 
     # -- event log -----------------------------------------------------
 
@@ -401,13 +540,148 @@ class JoystickWatchApp:
         _label, identifier, _source = self._mapping_options[idx]
 
         try:
-            self._config = get_mapping(identifier)
+            # Built-ins are shared module-level objects.  Keep the GUI copy
+            # private so calibration can never mutate a global preset.
+            self._config = copy.deepcopy(get_mapping(identifier))
         except Exception as exc:
             messagebox.showerror("Mapping Error", f"Failed to load mapping: {exc}")
             return
 
         self._rebuild_panels()
+        if self._calibration_mode.get():
+            self._reset_calibration()
         self._status_var.set(f"Mapping loaded: {self._config.name}")
+
+    # -- calibration ---------------------------------------------------
+
+    def _toggle_calibration(self) -> None:
+        panel = self._calibration_panel
+        main = self._main_content
+        if panel is None or main is None:
+            return
+        if self._calibration_mode.get():
+            if self._config is None:
+                self._on_select_mapping()
+            if self._config is None:
+                self._calibration_mode.set(False)
+                return
+            self.root.minsize(1180, 640)
+            panel.grid()
+            main.columnconfigure(2, weight=3)
+            self._reset_calibration()
+            self._status_var.set(
+                "Calibration: operate one control, then drag its assignment to the highlighted raw slot."
+            )
+        else:
+            panel.grid_remove()
+            self.root.minsize(900, 640)
+            main.columnconfigure(2, weight=0)
+            self._calibration_drag = None
+            self._status_var.set("Calibration closed; unapplied changes were discarded.")
+
+    def _reset_calibration(self) -> None:
+        if self._config is None:
+            return
+        self._calibration_draft = copy.deepcopy(self._config)
+        self._calibration_name.set(f"{self._config.name} (calibrated)")
+        self._populate_calibration_trees()
+
+    def _populate_calibration_trees(self) -> None:
+        draft = self._calibration_draft
+        if draft is None:
+            return
+        for kind, mappings in (("axis", draft.axes), ("button", draft.buttons)):
+            tree = self._calibration_trees[kind]
+            tree.delete(*tree.get_children())
+            for number, mapping in sorted(mappings.items()):
+                tree.insert(
+                    "",
+                    "end",
+                    iid=f"{kind}:{number}",
+                    values=(number, f"{mapping.label}  [{mapping.logical}]", "—"),
+                )
+
+    def _calibration_drag_start(self, event: tk.Event, kind: str) -> None:
+        tree = self._calibration_trees[kind]
+        item = tree.identify_row(event.y)
+        self._calibration_drag = (kind, item) if item else None
+
+    def _calibration_drag_end(self, event: tk.Event, kind: str) -> None:
+        drag = self._calibration_drag
+        self._calibration_drag = None
+        if drag is None or drag[0] != kind or self._calibration_draft is None:
+            return
+        tree = self._calibration_trees[kind]
+        target = tree.identify_row(event.y)
+        children = list(tree.get_children())
+        if not target or drag[1] not in children or target not in children:
+            return
+        source_index = children.index(drag[1])
+        target_index = children.index(target)
+        if source_index == target_index:
+            return
+        if kind == "axis":
+            self._calibration_draft.axes = reorder_mapping_slots(
+                self._calibration_draft.axes, source_index, target_index
+            )
+        else:
+            self._calibration_draft.buttons = reorder_mapping_slots(
+                self._calibration_draft.buttons, source_index, target_index
+            )
+        self._populate_calibration_trees()
+
+    def _apply_calibration(self) -> None:
+        if self._calibration_draft is None:
+            return
+        name = self._calibration_name.get().strip()
+        if name:
+            self._calibration_draft.name = name
+        self._config = copy.deepcopy(self._calibration_draft)
+        if self._parser is not None:
+            self._parser.mapping = self._config
+        self._rebuild_panels()
+        self._calibration_draft = copy.deepcopy(self._config)
+        self._populate_calibration_trees()
+        self._status_var.set(f"Calibration applied: {self._config.name}")
+
+    def _save_calibration(self) -> None:
+        draft = self._calibration_draft
+        if draft is None:
+            return
+        name = self._calibration_name.get().strip()
+        if name:
+            draft.name = name
+        filename = re.sub(r"[^a-z0-9]+", "_", draft.name.lower()).strip("_")
+        filename = (filename or "joystick_mapping") + ".yaml"
+        initial_dir = Path(
+            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+        ) / "joystick_watch" / "mappings"
+        path = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Save calibrated joystick mapping",
+            initialdir=str(initial_dir),
+            initialfile=filename,
+            defaultextension=".yaml",
+            filetypes=(("YAML mapping", "*.yaml"), ("All files", "*.*")),
+        )
+        if not path:
+            return
+        try:
+            import yaml
+
+            Path(path).write_text(
+                yaml.safe_dump(mapping_to_dict(draft), sort_keys=False),
+                encoding="utf-8",
+            )
+        except (ImportError, OSError) as exc:
+            messagebox.showerror("Save Mapping", f"Could not save mapping:\n{exc}")
+            return
+        self._status_var.set(f"Mapping saved: {path}")
+        messagebox.showinfo(
+            "Mapping Saved",
+            f"Saved calibrated mapping to:\n{path}\n\n"
+            "Refresh Mappings to select it in Joystick Watch.",
+        )
 
     # ==================================================================
     # Start / Stop
@@ -485,6 +759,7 @@ class JoystickWatchApp:
             events = parser.drain_events()
             for ev in events:
                 self._append_event_log(ev)
+                self._update_calibration_event(ev)
 
             snap = parser.get_snapshot()
             self._update_from_snapshot(snap)
@@ -545,6 +820,38 @@ class JoystickWatchApp:
             self._log_widget.delete("1.0", "200.0")
             self._log_widget.configure(state="disabled")
             self._log_lines = 0  # approximate reset
+
+    def _update_calibration_event(self, ev: JoystickEvent) -> None:
+        """Expose the latest raw event in the calibration assignment list."""
+        draft = self._calibration_draft
+        if not self._calibration_mode.get() or draft is None:
+            return
+
+        mappings = draft.axes if ev.event_type == "axis" else draft.buttons
+        if ev.number not in mappings:
+            # An incorrect preset may omit a physical control entirely.  Add
+            # a visible placeholder so it can still participate in dragging
+            # and be preserved in the exported mapping.
+            if ev.event_type == "axis":
+                mappings[ev.number] = AxisMapping(
+                    f"axis_{ev.number}", f"Axis {ev.number}", -32768, 32767
+                )
+            else:
+                mappings[ev.number] = ButtonMapping(
+                    f"button_{ev.number}", f"Button {ev.number}"
+                )
+            self._populate_calibration_trees()
+
+        tree = self._calibration_trees[ev.event_type]
+        item = f"{ev.event_type}:{ev.number}"
+        if not tree.exists(item):
+            return
+        for child in tree.get_children():
+            tree.item(child, tags=())
+        values = list(tree.item(item, "values"))
+        values[2] = ev.value
+        tree.item(item, values=values, tags=("changed",))
+        tree.see(item)
 
     # ==================================================================
     # Shutdown

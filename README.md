@@ -323,7 +323,27 @@ PYTHONPATH=src python -m joystick_watch --list-mappings
 - **Toolbar** — device selector, mapping selector, Start / Stop buttons, refresh buttons, status bar
 - **Axes panel** — progress bars with live numeric value labels for every axis in the mapping
 - **Buttons panel** — color-coded indicators (green = pressed, grey = released)
+- **Calibration panel** — live raw axis/button values with draggable logical assignments and YAML export
 - **Event log** — dark-themed scrollable text widget showing every event with timestamp, number, label, and value. Init events can be toggled with a checkbox.
+
+### Interactive Mapping Calibration
+
+Use calibration when the selected preset does not match the physical numbers
+reported by a controller or firmware version:
+
+1. Select the closest mapping, click **Start**, then enable **Calibration mode**.
+2. Operate one axis or button. Its ordered raw slot is highlighted and its live
+   value appears in the **Value** column.
+3. Drag the correct assignment (for example, `B [east]`) onto that highlighted
+   row. Raw physical numbers stay fixed while assignments move.
+4. Repeat for the other controls. Previously unknown raw controls are added as
+   placeholder rows automatically.
+5. Click **Apply** to use the draft immediately, or **Save YAML…** to output a
+   reusable mapping file. Save under
+   `~/.config/joystick_watch/mappings/` and click **↻ Mappings** to select it.
+
+**Reset** discards the current draft and starts again from the active mapping.
+Closing calibration mode also discards changes that were not applied or saved.
 
 ### Mapping Selection
 
